@@ -1,0 +1,2591 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verdulería Rincón Verde - Gestión Comercial, Costos y Listas LC</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Librería SheetJS para importar y exportar archivos Excel (.xlsx, .xls, .csv) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    .tab-active {
+      background-color: #059669;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
+    }
+    .tab-inactive {
+      background-color: #1e293b;
+      color: #cbd5e1;
+    }
+    .tab-inactive:hover {
+      background-color: #334155;
+      color: #ffffff;
+    }
+    /* Custom subtle scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    @media print {
+      .no-print { display: none !important; }
+      body { background: #fff !important; }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+  <!-- Confirmation Modal (Replaces confirm/alert) -->
+  <div id="confirm-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-200">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        </div>
+        <h3 id="modal-title" class="text-lg font-bold text-slate-900">Confirmar Acción</h3>
+      </div>
+      <p id="modal-message" class="text-sm text-slate-600 leading-relaxed"></p>
+      <div class="mt-6 flex justify-end gap-2">
+        <button id="modal-cancel" class="px-4 py-2 rounded-xl text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 transition">Cancelar</button>
+        <button id="modal-confirm" class="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Iniciar Nuevo Mes desde 0 y Archivar Mes Actual -->
+  <div id="new-month-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/70 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-slate-200 space-y-4">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-slate-900">Cerrar Mes y Comenzar Nuevo Mes en $0</h3>
+            <p class="text-xs text-slate-500">El mes actual se guardará íntegro en tu historial mensual</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeNewMonthModal()" class="text-slate-400 hover:text-slate-700 font-bold">✕</button>
+      </div>
+
+      <div class="bg-slate-50 rounded-xl p-3.5 border border-slate-200 text-xs space-y-1.5 text-slate-700">
+        <p class="font-bold text-slate-900">¿Qué ocurrirá al confirmar?</p>
+        <p>✅ <strong>Se archiva el mes actual (<span id="nm-current-label">Septiembre 2026</span>):</strong> Podrás volver a verlo o exportar su CSV cuando quieras desde el selector superior.</p>
+        <p>🔄 <strong>Contadores a $0:</strong> Las partidas de gastos, el historial de boletas y los cierres de caja diarios comenzarán en $0 para el nuevo mes.</p>
+        <p>📌 <strong>Se conserva intacto:</strong> Todo tu <strong>Catálogo Oficial</strong> (precios, costos y Excel importados) y tus productos fijados en la <strong>Lista LC Fija</strong>.</p>
+      </div>
+
+      <form onsubmit="confirmStartNewMonth(event)" class="space-y-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Nombre del Nuevo Mes a Iniciar *</label>
+          <input id="nm-next-name" type="text" required placeholder="Ej: Octubre 2026" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeNewMonthModal()" class="px-4 py-2 rounded-xl text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 transition">Cancelar</button>
+          <button type="submit" class="px-5 py-2 rounded-xl text-sm font-bold text-slate-950 bg-amber-500 hover:bg-amber-400 shadow-sm transition">
+            Archivar y Empezar en $0
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Top Navigation Header -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-lg no-print">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between py-3.5 gap-3">
+        <!-- Brand -->
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-md shrink-0">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-lg sm:text-xl font-extrabold tracking-tight text-white">Verdulería Rincón Verde</h1>
+              <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                ERP Local
+              </span>
+            </div>
+            <p class="text-xs text-slate-400">Gestión de Gastos, Caja Diaria, Catálogo y Lista LC Fija</p>
+          </div>
+        </div>
+
+        <!-- Global Actions & Persistence Status -->
+        <div class="flex flex-wrap items-center gap-2 justify-between md:justify-end">
+          <!-- Selector de Mes Activo / Archivo Histórico -->
+          <div class="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1 rounded-xl border border-slate-700">
+            <span class="text-[11px] font-semibold text-emerald-400">Mes:</span>
+            <select id="month-selector" onchange="switchActiveMonth(this.value)" class="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer">
+              <option value="current">Septiembre 2026 (Activo)</option>
+            </select>
+          </div>
+          <button onclick="openNewMonthModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition shadow-xs" title="Guardar mes actual en historial e iniciar nuevo mes en $0">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            Nuevo Mes (Desde 0)
+          </button>
+          <span id="save-indicator" class="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-slate-800 text-emerald-300 border border-slate-700">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Guardado
+          </span>
+          <button onclick="exportFullReportCSV()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-xs">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Exportar CSV
+          </button>
+          <button onclick="askResetDemoData()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Restaurar datos originales de Septiembre">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Restaurar
+          </button>
+        </div>
+      </div>
+
+      <!-- Banner Modo Consulta Histórica (Visible al ver meses archivados) -->
+      <div id="archive-view-banner" class="hidden mb-2 px-4 py-2 rounded-xl bg-amber-500/20 border border-amber-400/50 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <span class="text-amber-200 font-semibold">
+          📂 Estás consultando el archivo histórico de <strong id="archive-banner-name" class="text-white underline"></strong> (Modo lectura).
+        </span>
+        <button onclick="switchActiveMonth('current')" class="px-3 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold transition">
+          Volver al Mes Activo →
+        </button>
+      </div>
+
+      <!-- Module Navigation Tabs -->
+      <nav class="flex overflow-x-auto pb-3 pt-1 gap-2 no-scrollbar" aria-label="Módulos del sistema">
+        <button onclick="switchTab('dashboard')" id="tab-btn-dashboard" class="tab-active shrink-0 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          1. Tablero y Utilidad
+        </button>
+        <button onclick="switchTab('scanner')" id="tab-btn-scanner" class="tab-inactive shrink-0 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          2. Escáner y Gastos
+        </button>
+        <button onclick="switchTab('lc')" id="tab-btn-lc" class="tab-inactive shrink-0 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+          3. Lista LC Fija y Compras
+          <span id="lc-badge-count" class="ml-1 px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-amber-400 text-slate-950">0</span>
+        </button>
+        <button onclick="switchTab('caja')" id="tab-btn-caja" class="tab-inactive shrink-0 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+          4. Cuadre Caja y Eleventa
+        </button>
+        <button onclick="switchTab('catalog')" id="tab-btn-catalog" class="tab-inactive shrink-0 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+          5. Catálogo Oficial
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Workspace Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- =================================================================== -->
+    <!-- TAB 1: TABLERO Y UTILIDAD                                           -->
+    <!-- =================================================================== -->
+    <section id="view-dashboard" class="space-y-6">
+      <!-- KPI Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Ingresos por Retiro</span>
+            <span class="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </span>
+          </div>
+          <div id="kpi-retiro" class="mt-3 text-2xl sm:text-3xl font-extrabold text-slate-900">$0</div>
+          <p id="kpi-retiro-sub" class="mt-1 text-xs text-slate-500">Efectivo + Tarjeta</p>
+        </div>
+
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Ventas POS Eleventa</span>
+            <span class="p-2 rounded-xl bg-sky-50 text-sky-600">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+            </span>
+          </div>
+          <div id="kpi-eleventa" class="mt-3 text-2xl sm:text-3xl font-extrabold text-slate-900">$0</div>
+          <p id="kpi-eleventa-sub" class="mt-1 text-xs text-slate-500">Ganancia Bruta POS</p>
+        </div>
+
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Gastos Consolidados</span>
+            <span class="p-2 rounded-xl bg-rose-50 text-rose-600">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/></svg>
+            </span>
+          </div>
+          <div id="kpi-gastos" class="mt-3 text-2xl sm:text-3xl font-extrabold text-rose-600">$0</div>
+          <p id="kpi-gastos-sub" class="mt-1 text-xs text-slate-500">Hoja Resumen + Listas LC</p>
+        </div>
+
+        <div class="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-5 border border-slate-700 shadow-md text-white">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">Utilidad Neta Real</span>
+            <span id="kpi-margin-badge" class="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-500 text-slate-950">0%</span>
+          </div>
+          <div id="kpi-utilidad" class="mt-3 text-2xl sm:text-3xl font-extrabold text-white">$0</div>
+          <p class="mt-1 text-xs text-slate-400">Ingresos Retiro − Gastos Totales</p>
+        </div>
+      </div>
+
+      <!-- Visual Cash Flow & Expense Breakdown -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Balance Chart Card -->
+        <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-5">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Flujo Financiero del Período</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Proporción entre gastos operativos y utilidad neta retenida</p>
+          </div>
+
+          <div class="space-y-4">
+            <div>
+              <div class="flex justify-between text-xs font-semibold mb-1.5">
+                <span class="text-slate-700">Ingresos Totales (100%)</span>
+                <span id="bar-retiro-label" class="font-bold text-slate-900">$0</span>
+              </div>
+              <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                <div class="h-full bg-emerald-500 rounded-full" style="width: 100%"></div>
+              </div>
+            </div>
+
+            <div>
+              <div class="flex justify-between text-xs font-semibold mb-1.5">
+                <span class="text-rose-700">Gastos Totales (<span id="bar-gastos-pct">0%</span>)</span>
+                <span id="bar-gastos-label" class="font-bold text-rose-700">$0</span>
+              </div>
+              <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                <div id="bar-gastos-fill" class="h-full bg-rose-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+              </div>
+            </div>
+
+            <div>
+              <div class="flex justify-between text-xs font-semibold mb-1.5">
+                <span class="text-emerald-700">Utilidad Neta (<span id="bar-util-pct">0%</span>)</span>
+                <span id="bar-util-label" class="font-bold text-emerald-700">$0</span>
+              </div>
+              <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                <div id="bar-util-fill" class="h-full bg-emerald-600 rounded-full transition-all duration-500" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-100 flex flex-col gap-2">
+            <button onclick="switchTab('lc')" class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs">
+              Ir a Lista LC Fija y Planificar Compra →
+            </button>
+            <button onclick="switchTab('scanner')" class="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold transition">
+              + Registrar Boleta o Gasto Directo
+            </button>
+          </div>
+        </div>
+
+        <!-- Resumen Categorías Table -->
+        <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
+          <div class="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 class="text-base font-bold text-slate-900">Hoja Resumen de Gastos por Partida</h2>
+              <p class="text-xs text-slate-500">Se actualiza automáticamente al ingresar boletas o cerrar compras LC</p>
+            </div>
+            <input id="dashboard-cat-search" type="text" oninput="renderDashboard()" placeholder="Filtrar partida o tipo..." class="px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 w-full sm:w-56" />
+          </div>
+          <div class="overflow-x-auto max-h-96">
+            <table class="w-full text-left border-collapse">
+              <thead class="bg-slate-50 sticky top-0 border-b border-slate-200 text-[11px] font-bold uppercase text-slate-500">
+                <tr>
+                  <th class="py-3 px-4">Partida / Categoría</th>
+                  <th class="py-3 px-4">Clasificación</th>
+                  <th class="py-3 px-4 text-right">Monto Acumulado</th>
+                  <th class="py-3 px-4 text-right">% Gasto</th>
+                </tr>
+              </thead>
+              <tbody id="dashboard-categories-body" class="divide-y divide-slate-100 text-sm"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- TAB 2: ESCÁNER Y REGISTRO DE GASTOS                                 -->
+    <!-- =================================================================== -->
+    <section id="view-scanner" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Form & OCR Simulator -->
+        <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-5">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Ingreso de Gasto / Documento</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Registra facturas, boletas o compras rápidas en la hoja Resumen</p>
+          </div>
+
+          <!-- Simulated Receipt Dropzone -->
+          <div class="border-2 border-dashed border-emerald-300 bg-emerald-50/50 rounded-2xl p-4 text-center space-y-2">
+            <label for="receipt-file-input" class="cursor-pointer flex flex-col items-center gap-1.5">
+              <span class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              </span>
+              <span class="text-xs font-bold text-emerald-900">Subir foto de Boleta / Factura</span>
+              <span class="text-[11px] text-emerald-700">Previsualización local instantánea</span>
+            </label>
+            <input id="receipt-file-input" type="file" accept="image/*" onchange="handleReceiptPreview(event)" class="hidden" />
+            <div id="receipt-preview-box" class="hidden pt-2">
+              <img id="receipt-preview-img" src="" alt="Vista previa documento" class="max-h-36 mx-auto rounded-xl border border-slate-200 shadow-xs" />
+            </div>
+          </div>
+
+          <form id="expense-form" onsubmit="saveExpenseEntry(event)" class="space-y-3.5">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Fecha *</label>
+              <input id="exp-date" type="date" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Partida en Resumen *</label>
+              <select id="exp-category" onchange="toggleNewCategoryInput(this.value)" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"></select>
+              <input id="exp-new-category" type="text" placeholder="Nombre de la nueva partida..." class="hidden mt-2 w-full px-3.5 py-2 rounded-xl border border-emerald-400 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Proveedor *</label>
+                <input id="exp-provider" type="text" required placeholder="Ej: Feria / Soprole" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">N° Boleta / Fact.</label>
+                <input id="exp-doc" type="text" placeholder="Ej: F-1042" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Monto Total ($) *</label>
+              <input id="exp-total" type="number" min="1" step="1" required placeholder="Ej: 45000" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Detalle / Observación</label>
+              <input id="exp-detail" type="text" placeholder="Ej: Reposición abarrotes y bolsas" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+
+            <button type="submit" class="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition shadow-sm">
+              + Registrar Gasto en Resumen
+            </button>
+          </form>
+        </div>
+
+        <!-- Expenses History Table -->
+        <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
+          <div class="p-5 border-b border-slate-200 flex items-center justify-between">
+            <div>
+              <h2 class="text-base font-bold text-slate-900">Historial de Documentos y Compras</h2>
+              <p class="text-xs text-slate-500">Cada registro suma directamente a la partida seleccionada</p>
+            </div>
+            <span id="expenses-log-count" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700">0 registros</span>
+          </div>
+          <div class="overflow-x-auto flex-1">
+            <table class="w-full text-left border-collapse">
+              <thead class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase text-slate-500">
+                <tr>
+                  <th class="py-3 px-4">Fecha</th>
+                  <th class="py-3 px-4">Partida</th>
+                  <th class="py-3 px-4">Proveedor / Doc</th>
+                  <th class="py-3 px-4">Detalle</th>
+                  <th class="py-3 px-4 text-right">Total</th>
+                  <th class="py-3 px-4 text-center">Acción</th>
+                </tr>
+              </thead>
+              <tbody id="expenses-log-body" class="divide-y divide-slate-100 text-sm"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- TAB 3: LISTA LC FIJA Y PLANIFICACIÓN DE COMPRA                      -->
+    <!-- =================================================================== -->
+    <section id="view-lc" class="hidden space-y-6">
+      <!-- Top LC Banner & Summary -->
+      <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 rounded-2xl p-6 text-white shadow-lg border border-slate-700">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div class="space-y-1.5">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              <span>📌 Lista Maestra Fija Vinculada al Catálogo</span>
+            </div>
+            <h2 class="text-xl sm:text-2xl font-extrabold tracking-tight">Planificación de Compra en Feria / Proveedores (Lista LC)</h2>
+            <p class="text-xs sm:text-sm text-slate-300 max-w-2xl">
+              Esta lista mantiene fijos todos los productos marcados en el <strong>Catálogo Oficial</strong>. Selecciona con el check <strong>"Comprar"</strong> lo que necesitas reponer hoy, revisa su <strong>Costo + Unidad Anterior</strong> y consulta el <strong>P. Venta Catálogo</strong> como recordatorio.
+            </p>
+          </div>
+
+          <!-- KPIs Planificación Hoy -->
+          <div class="grid grid-cols-3 gap-3 bg-slate-950/50 p-3.5 rounded-2xl border border-slate-700/80 shrink-0">
+            <div class="px-2">
+              <div class="text-[11px] text-slate-400 font-medium">Fijos en LC</div>
+              <div id="lc-kpi-fixed" class="text-lg sm:text-xl font-extrabold text-white">0</div>
+            </div>
+            <div class="px-2 border-l border-slate-700">
+              <div class="text-[11px] text-amber-300 font-medium">A Comprar Hoy</div>
+              <div id="lc-kpi-selected" class="text-lg sm:text-xl font-extrabold text-amber-400">0</div>
+            </div>
+            <div class="px-2 border-l border-slate-700">
+              <div class="text-[11px] text-emerald-300 font-medium">Total Compra</div>
+              <div id="lc-kpi-total" class="text-lg sm:text-xl font-extrabold text-emerald-400">$0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toolbar: Sub-views, Filters & Quick Actions -->
+      <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-4 no-print">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <!-- Sub-view Switcher -->
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="setLCSubView('plan')" id="lc-subbtn-plan" class="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white shadow-xs transition">
+              1. Planificar y Cotizar Lista Fija
+            </button>
+            <button onclick="setLCSubView('shopping')" id="lc-subbtn-shopping" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+              2. Orden de Compra por Proveedor (<span id="lc-shopping-count">0</span>)
+            </button>
+            <button onclick="switchTab('catalog')" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition">
+              + Administrar Fijos en Catálogo
+            </button>
+          </div>
+
+          <!-- Bulk Selection Helpers -->
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="toggleSelectAllLC(true)" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+              Marcar visibles
+            </button>
+            <button onclick="toggleSelectAllLC(false)" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+              Limpiar selección
+            </button>
+            <button onclick="exportLCOrderCSV()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition">
+              Exportar Lista Compra CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- Search & Filter Row -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-100">
+          <div>
+            <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Buscar en Lista LC Fija</label>
+            <input id="lc-product-search" type="text" oninput="renderLCItems()" placeholder="Ej: Tomate, Palta, Limon, Nuez..." class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Filtrar Planificación</label>
+            <select id="lc-plan-filter" onchange="renderLCItems()" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="all">Todos los fijos en LC</option>
+              <option value="buy">Solo marcados para COMPRAR HOY</option>
+              <option value="pending">No marcados aún</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Filtrar por Proveedor</label>
+            <select id="lc-provider-filter" onchange="renderLCItems()" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="ALL">Todos los proveedores</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUB-VIEW A: TABLA COMPLETA DE LISTA LC FIJA -->
+      <div id="lc-view-plan" class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead class="bg-slate-900 text-slate-200 text-[11px] font-bold uppercase tracking-wider">
+              <tr>
+                <th class="py-3.5 px-3 text-center w-16">Comprar</th>
+                <th class="py-3.5 px-3">Producto (Fijo LC)</th>
+                <th class="py-3.5 px-3">Proveedor</th>
+                <th class="py-3.5 px-3 bg-slate-800/90 text-amber-300">Costo Ant. + Unidad Ant.</th>
+                <th class="py-3.5 px-3 text-right">Cant.</th>
+                <th class="py-3.5 px-3">Unidad Compra</th>
+                <th class="py-3.5 px-3 text-right">Equiv. (Kg/u)</th>
+                <th class="py-3.5 px-3 text-right">Costo Compra ($)</th>
+                <th class="py-3.5 px-3 text-right bg-emerald-950/60 text-emerald-300">Costo Unit. Real</th>
+                <th class="py-3.5 px-3 text-right bg-sky-950/60 text-sky-300">P. Venta Catálogo (Ref.)</th>
+                <th class="py-3.5 px-3 text-right">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody id="lc-items-body" class="divide-y divide-slate-200 text-sm"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SUB-VIEW B: ORDEN DE COMPRA AGRUPADA POR PROVEEDOR (FERIA) -->
+      <div id="lc-view-shopping" class="hidden space-y-4">
+        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 class="text-sm font-bold text-amber-900">Resumen Listo para Comprar en Feria / Proveedores</h3>
+            <p class="text-xs text-amber-800">Solo muestra los productos con el check <strong>"Comprar"</strong> activado, agrupados por proveedor.</p>
+          </div>
+          <button onclick="window.print()" class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition no-print">
+            🖨️ Imprimir Orden de Compra
+          </button>
+        </div>
+        <div id="lc-shopping-grouped" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+      </div>
+
+      <!-- LC CLOSING & TRANSFER BAR -->
+      <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4 no-print">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Nombre de Jornada / Fecha LC (para Hoja Resumen)</label>
+            <input id="lc-session-name" type="text" placeholder="Ej: LC 23-09" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <div class="flex items-center">
+            <label class="inline-flex items-start gap-2.5 cursor-pointer select-none">
+              <input id="lc-update-catalog-cost" type="checkbox" checked class="mt-0.5 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500" />
+              <span class="text-xs text-slate-600 leading-snug">
+                Actualizar <strong>Costo Anterior + Unidad Anterior</strong> (y costo base del catálogo) con los precios comprados hoy. <em>Los productos seguirán fijos en LC.</em>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <button onclick="closeAndTransferLC()" class="px-6 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-extrabold shadow-md transition shrink-0">
+          Registrar Compra LC en Gastos →
+        </button>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- TAB 4: CUADRE CAJA Y ELEVENTA                                       -->
+    <!-- =================================================================== -->
+    <section id="view-caja" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Form Nuevo Cierre Diario -->
+        <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Cierre Diario de Caja y POS</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Compara efectivo + tarjeta retirada frente a ventas Eleventa</p>
+          </div>
+
+          <form id="caja-form" onsubmit="saveCajaEntry(event)" class="space-y-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Fecha de Cierre *</label>
+              <input id="caja-date" type="date" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Retiro Efectivo ($) *</label>
+                <input id="caja-efectivo" type="number" min="0" step="1" required oninput="updateCajaPreview()" placeholder="0" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Retiro Tarjeta ($) *</label>
+                <input id="caja-tarjeta" type="number" min="0" step="1" required oninput="updateCajaPreview()" placeholder="0" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Venta Eleventa ($) *</label>
+                <input id="caja-eleventa" type="number" min="0" step="1" required oninput="updateCajaPreview()" placeholder="0" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Ganancia POS ($)</label>
+                <input id="caja-gain" type="number" min="0" step="1" placeholder="0" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              </div>
+            </div>
+
+            <!-- Live Cuadre Preview -->
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1 text-xs">
+              <div class="flex justify-between">
+                <span class="text-slate-600">Total Retirado:</span>
+                <span id="caja-preview-retiro" class="font-bold text-slate-900">$0</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-600">Diferencia vs Eleventa:</span>
+                <span id="caja-preview-diff" class="font-bold text-emerald-700">$0</span>
+              </div>
+            </div>
+
+            <button type="submit" class="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition shadow-xs">
+              + Guardar Cierre del Día
+            </button>
+          </form>
+        </div>
+
+        <!-- Tabla de Cierres Diarios -->
+        <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
+          <div class="p-5 border-b border-slate-200 flex items-center justify-between">
+            <div>
+              <h2 class="text-base font-bold text-slate-900">Registro Diario de Caja y Cuadre POS</h2>
+              <p class="text-xs text-slate-500">Historial consolidado de ingresos reales vs reportes Eleventa</p>
+            </div>
+            <span id="caja-days-count" class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">0 días</span>
+          </div>
+          <div class="overflow-x-auto max-h-[520px]">
+            <table class="w-full text-left border-collapse">
+              <thead class="bg-slate-50 sticky top-0 border-b border-slate-200 text-[11px] font-bold uppercase text-slate-500">
+                <tr>
+                  <th class="py-3 px-3.5">Fecha</th>
+                  <th class="py-3 px-3.5 text-right">Efectivo</th>
+                  <th class="py-3 px-3.5 text-right">Tarjeta</th>
+                  <th class="py-3 px-3.5 text-right">Total Retiro</th>
+                  <th class="py-3 px-3.5 text-right">Eleventa</th>
+                  <th class="py-3 px-3.5 text-right">Cuadre</th>
+                  <th class="py-3 px-3.5 text-right">Ganancia POS</th>
+                  <th class="py-3 px-3.5 text-right">% Margen</th>
+                </tr>
+              </thead>
+              <tbody id="caja-table-body" class="divide-y divide-slate-100 text-sm"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- TAB 5: CATÁLOGO OFICIAL (CON CHECKBOX PARA FIJAR EN LISTA LC)       -->
+    <!-- =================================================================== -->
+    <section id="view-catalog" class="hidden space-y-6">
+      <!-- Panel de Importación Excel / CSV -->
+      <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-sky-950 rounded-2xl p-5 text-white shadow-md border border-slate-700">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div class="space-y-1">
+            <div class="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-500/20 text-sky-300 border border-sky-400/30">
+              <span>📊 Actualización Masiva sin Pérdida de Datos</span>
+            </div>
+            <h2 class="text-lg sm:text-xl font-extrabold">Importar Catálogo desde Excel (.xlsx, .xls, .csv)</h2>
+            <p class="text-xs text-slate-300 max-w-2xl">
+              Agrega nuevos productos y actualiza precios desde una planilla Excel. <strong>Nunca borra tu data anterior:</strong> conserva tus productos existentes, tus ítems fijados en Lista LC y todo tu historial de gastos y caja.
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+            <button onclick="downloadCatalogTemplate()" class="px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 transition">
+              📥 Descargar Plantilla Excel
+            </button>
+            <label for="excel-catalog-input" class="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-sm transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+              Subir Excel de Catálogo
+            </label>
+            <input id="excel-catalog-input" type="file" accept=".xlsx,.xls,.csv" onchange="handleExcelCatalogUpload(event)" class="hidden" />
+          </div>
+        </div>
+
+        <!-- Vista Previa de Importación Excel (Oculta hasta cargar archivo) -->
+        <div id="excel-import-preview" class="hidden mt-4 pt-4 border-t border-slate-700/80 bg-slate-950/60 rounded-xl p-4 space-y-3">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h3 class="text-sm font-bold text-white" id="excel-preview-title">Archivo analizado</h3>
+              <p class="text-xs text-slate-300" id="excel-preview-summary">0 productos nuevos · 0 productos existentes</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+              <label class="inline-flex items-center gap-1.5 text-xs text-slate-200 cursor-pointer">
+                <input id="excel-opt-update-prices" type="checkbox" checked class="w-4 h-4 rounded text-emerald-500" />
+                <span>Actualizar precios/costos de existentes</span>
+              </label>
+              <label class="inline-flex items-center gap-1.5 text-xs text-amber-300 cursor-pointer">
+                <input id="excel-opt-add-to-lc" type="checkbox" class="w-4 h-4 rounded text-amber-500" />
+                <span>Fijar nuevos en Lista LC</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="max-h-40 overflow-y-auto rounded-lg border border-slate-700 bg-slate-900/90">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-800 text-slate-300 uppercase text-[10px]">
+                <tr>
+                  <th class="py-1.5 px-3">Estado</th>
+                  <th class="py-1.5 px-3">Código</th>
+                  <th class="py-1.5 px-3">Producto</th>
+                  <th class="py-1.5 px-3 text-right">P. Costo</th>
+                  <th class="py-1.5 px-3 text-right">P. Venta</th>
+                </tr>
+              </thead>
+              <tbody id="excel-preview-body" class="divide-y divide-slate-800 text-slate-200"></tbody>
+            </table>
+          </div>
+
+          <div class="flex justify-end gap-2">
+            <button onclick="cancelExcelImport()" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
+              Cancelar
+            </button>
+            <button onclick="applyExcelImport()" class="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-xs transition">
+              ✓ Fusionar al Catálogo (Sin Borrar Data)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <!-- Add New Product to Catalog Form -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4 h-fit">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Nuevo Producto en Catálogo</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Define su precio de venta y elige si quedará fijo en Lista LC</p>
+          </div>
+
+          <form onsubmit="addCatalogProduct(event)" class="space-y-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Código / PLU *</label>
+              <input id="cat-new-code" type="text" required placeholder="Ej: 85 o 78012345" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Nombre del Producto *</label>
+              <input id="cat-new-name" type="text" required placeholder="Ej: Palta Hass" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+            <div class="grid grid-cols-2 gap-2.5">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">P. Costo ($) *</label>
+                <input id="cat-new-cost" type="number" min="0" step="1" required placeholder="1200" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">P. Venta ($) *</label>
+                <input id="cat-new-price" type="number" min="0" step="1" required placeholder="2500" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-bold text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2.5">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Proveedor Habitual</label>
+                <input id="cat-new-prov" type="text" placeholder="Feria / Calera" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Unidad Compra</label>
+                <select id="cat-new-unit" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                  <option value="Kg">Kg</option>
+                  <option value="Caja">Caja</option>
+                  <option value="Saco">Saco</option>
+                  <option value="Malla">Malla</option>
+                  <option value="Unidad">Unidad</option>
+                  <option value="Atado">Atado</option>
+                  <option value="Bandeja">Bandeja</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="pt-1">
+              <label class="flex items-center gap-2.5 p-3 rounded-xl bg-emerald-50 border border-emerald-200 cursor-pointer">
+                <input id="cat-new-inlc" type="checkbox" checked class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500" />
+                <span class="text-xs font-bold text-emerald-900">Mantener fijo en Lista LC</span>
+              </label>
+            </div>
+
+            <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs">
+              + Guardar en Catálogo
+            </button>
+          </form>
+        </div>
+
+        <!-- Master Catalog Table -->
+        <div class="lg:col-span-3 bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
+          <div class="p-5 border-b border-slate-200 space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 class="text-base font-bold text-slate-900">Catálogo Maestro de Productos y Precios</h2>
+                <p class="text-xs text-slate-500">Marca la casilla <strong>"En LC Fija"</strong> para mantener cualquier producto fijo en la lista de compras hasta que lo desmarques.</p>
+              </div>
+              <span id="catalog-count-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-800 self-start sm:self-auto">0 productos</span>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-3">
+              <input id="catalog-search" type="text" oninput="renderCatalogTab()" placeholder="Buscar por código PLU, nombre o proveedor..." class="flex-1 px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              <select id="catalog-lc-filter" onchange="renderCatalogTab()" class="px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                <option value="all">Todos los productos</option>
+                <option value="in_lc">Solo Fijos en Lista LC</option>
+                <option value="not_lc">Fuera de Lista LC</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto max-h-[620px]">
+            <table class="w-full text-left border-collapse">
+              <thead class="bg-slate-50 sticky top-0 border-b border-slate-200 text-[11px] font-bold uppercase text-slate-500 z-10">
+                <tr>
+                  <th class="py-3 px-3 text-center bg-emerald-50/80 text-emerald-900 w-24">En LC Fija</th>
+                  <th class="py-3 px-3">Código</th>
+                  <th class="py-3 px-3">Producto</th>
+                  <th class="py-3 px-3 text-right">P. Costo Base</th>
+                  <th class="py-3 px-3 text-right">P. Venta Catálogo</th>
+                  <th class="py-3 px-3 text-right">Margen</th>
+                  <th class="py-3 px-3">Últ. Costo / Unidad</th>
+                </tr>
+              </thead>
+              <tbody id="catalog-table-body" class="divide-y divide-slate-100 text-sm"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // =========================================================================
+    // DATA SEEDING: CATÁLOGO MAESTRO + HISTORIAL DE UNIDADES Y COSTOS LC
+    // =========================================================================
+    const STORAGE_KEY = 'rincon_verde_erp_v3_fixed_lc';
+
+    // Estructura: [codigo, producto, costo_cat, venta_cat, in_lc(1/0), proveedor, costo_ant, unidad_ant]
+    const RAW_CATALOG_DATA = [
+      ["1", "Tomate", 1150, 2300, 1, "Feria / Calera", 18000, "Caja"],
+      ["2", "Papa", 625, 1500, 1, "Feria / Calera", 20000, "Saco"],
+      ["3", "Zanahoria", 1200, 2300, 1, "Feria / Calera", 25000, "Saco"],
+      ["4", "Cebolla Guarda", 1500, 2300, 1, "Feria / Calera", 18000, "Malla"],
+      ["5", "Cebolla Nueva", 250, 400, 1, "Feria / Calera", 6000, "Malla"],
+      ["6", "Palta Chilena", 4300, 6500, 1, "Feria / Calera", 4300, "Kg"],
+      ["7", "LIMON", 410, 850, 1, "Feria / Calera", 2500, "Malla"],
+      ["8", "Zapallo Italiano", 260, 600, 1, "Feria / Calera", 19000, "Caja"],
+      ["9", "Zapallo Camote", 2000, 3500, 1, "Feria / Calera", 37000, "Saco"],
+      ["10", "Ajo", 200, 400, 1, "Feria / Calera", 17000, "Caja"],
+      ["11", "Perejil", 400, 1000, 1, "Feria / Calera", 2000, "Atado"],
+      ["12", "Coliflor", 1000, 2000, 1, "Verde", 1200, "Unidad"],
+      ["13", "Brocoli", 1000, 2000, 1, "Verde", 700, "Unidad"],
+      ["14", "Pepino", 270, 600, 1, "Feria / Calera", 29000, "Caja"],
+      ["15", "Pimenton Rojo", 833, 2000, 1, "Feria / Calera", 833, "Unidad"],
+      ["16", "Pimenton Verde", 800, 2000, 1, "Feria / Calera", 800, "Unidad"],
+      ["17", "Pimenton Amarillo", 700, 2000, 1, "Feria / Calera", 700, "Unidad"],
+      ["18", "Aji Verde", 250, 700, 1, "Feria / Calera", 12000, "Caja"],
+      ["20", "Lechuga Costina", 600, 1700, 1, "Verde", 10000, "Caja"],
+      ["21", "Lechuga Escarola", 1000, 1800, 1, "Verde", 20000, "Caja"],
+      ["22", "Lechuga Milanesa", 500, 1200, 1, "Feria / Calera", 500, "Unidad"],
+      ["23", "Lechuga Morada", 550, 1500, 1, "Verde", 9000, "Caja"],
+      ["24", "Lechuga Española", 550, 1550, 1, "Feria / Calera", 550, "Unidad"],
+      ["25", "Lechuga Marina", 550, 1500, 1, "Verde", 9000, "Caja"],
+      ["26", "Repollo", 1800, 3200, 1, "Verde", 1800, "Unidad"],
+      ["27", "Repollo Morado", 2200, 3500, 1, "Verde", 1800, "Unidad"],
+      ["28", "Beterraga", 1000, 2000, 1, "Feria / Calera", 1000, "Atado"],
+      ["29", "Poroto Granado Bolsa", 2000, 3500, 1, "Feria / Calera", 37000, "Saco"],
+      ["30", "Cilantro", 500, 1200, 1, "Verde", 3000, "Atado"],
+      ["31", "Albaca", 600, 1300, 1, "Verde", 3000, "Atado"],
+      ["32", "Cibulett", 150, 600, 1, "Hidropo", 35000, "Caja"],
+      ["33", "Rucula", 500, 1490, 1, "Hidropo", 700, "Unidad"],
+      ["35", "Acelga", 400, 800, 1, "Verde", 2000, "Atado"],
+      ["36", "Espinaca", 450, 1200, 1, "Verde", 3000, "Atado"],
+      ["37", "Alcachofa", 350, 700, 1, "Feria / Calera", 16000, "Caja"],
+      ["38", "Rabano", 500, 1290, 1, "Feria / Calera", 500, "Atado"],
+      ["39", "Apio", 1000, 2000, 1, "Feria / Calera", 7000, "Unidad"],
+      ["40", "Poroto Verde", 3000, 4000, 1, "Feria / Calera", 2000, "Kg"],
+      ["41", "Porotos Granados", 1250, 2500, 1, "Feria / Calera", 1250, "Kg"],
+      ["42", "Cebollin", 850, 1350, 1, "Feria / Calera", 7000, "Atado"],
+      ["43", "Choclo Americano", 750, 1300, 1, "Feria / Calera", 45000, "Saco"],
+      ["44", "Choclo Humero", 550, 700, 1, "Feria / Calera", 350, "Unidad"],
+      ["45", "Gengibre", 3500, 6900, 1, "Feria / Calera", 3500, "Kg"],
+      ["46", "Curcuma", 650, 1500, 1, "Feria / Calera", 650, "Kg"],
+      ["47", "Menta", 650, 1300, 1, "Hidropo", 4000, "Unidad"],
+      ["48", "Champiñon", 1000, 2300, 1, "Hidropo", 1400, "Bandeja"],
+      ["50", "Limon Sutil", 3000, 4500, 1, "Hidropo", 2500, "Kg"],
+      ["51", "Tomate Cherry", 1100, 3000, 1, "Feria / Calera", 40000, "Caja"],
+      ["53", "Platano", 1150, 2450, 1, "Feria / Calera", 19000, "Caja"],
+      ["54", "Frutilla", 500, 1700, 1, "Feria / Calera", 20000, "Caja"],
+      ["55", "Chirimolla", 1800, 4000, 1, "Feria / Calera", 1800, "Kg"],
+      ["56", "Mandarina", 800, 1500, 1, "Angel", 5000, "Caja"],
+      ["57", "Kiwi", 2000, 3400, 1, "Fruta", 15000, "Caja"],
+      ["58", "Mango", 1300, 1800, 1, "Feria / Calera", 12000, "Caja"],
+      ["59", "Arandano 125g", 1666, 2500, 1, "Feria / Calera", 1666, "Bandeja"],
+      ["60", "Naranja", 750, 1500, 1, "Feria / Calera", 6000, "Malla"],
+      ["61", "Piña", 2500, 3400, 1, "Feria / Calera", 17000, "Caja"],
+      ["62", "Manzana PInk LADY", 1660, 2700, 1, "Gorda", 17000, "Caja"],
+      ["63", "Manzana Verde", 1660, 2700, 1, "Blanca", 17000, "Caja"],
+      ["64", "Champiñon Granel", 8500, 11500, 1, "Hidropo", 1400, "Kg"],
+      ["65", "Queso De Cabra", 12500, 18000, 1, "Feria / Calera", 12500, "Kg"],
+      ["66", "Pera Verde", 1660, 2700, 1, "Gorda", 17000, "Caja"],
+      ["67", "Lucuma", 2000, 3200, 1, "Feria / Calera", 2000, "Kg"],
+      ["68", "Durazno Platano", 1330, 2800, 1, "Feria / Calera", 15000, "Caja"],
+      ["69", "Durazno Conservero", 1330, 2800, 1, "Feria / Calera", 15000, "Caja"],
+      ["70", "Nectarin", 1330, 2800, 1, "Feria / Calera", 15000, "Caja"],
+      ["71", "Melon Tuna", 2000, 3000, 1, "Feria / Calera", 1500, "Unidad"],
+      ["73", "Uva Negra", 500, 1000, 1, "Feria / Calera", 500, "Kg"],
+      ["74", "Ciruela", 950, 2000, 1, "Feria / Calera", 12000, "Caja"],
+      ["77", "Pepino Fruta", 1660, 2700, 1, "Blanca", 15000, "Caja"],
+      ["78", "Frambueza", 1454, 6990, 1, "Feria / Calera", 1454, "Bandeja"],
+      ["79", "Damasco", 1000, 1550, 1, "Feria / Calera", 14000, "Caja"],
+      ["80", "Cereza", 1000, 2000, 1, "Cerezo", 1200, "Kg"],
+      ["82", "Membrillo", 1200, 2200, 1, "Feria / Calera", 1200, "Kg"],
+      ["83", "Sandia Granel", 900, 1800, 1, "Feria / Calera", 1400, "Kg"],
+      ["84", "Alcachofa Cocida", 1400, 2000, 1, "Feria / Calera", 1400, "Unidad"],
+      ["85", "Pebre", 750, 1500, 1, "Peruano", 750, "Unidad"],
+      ["87", "Mote Con Huesillo", 750, 1500, 1, "Turco", 750, "Unidad"],
+      ["88", "Enzaladas Variedad", 450, 700, 1, "Feria / Calera", 450, "Unidad"],
+      ["89", "Aceituna 1/4", 1000, 2000, 1, "Aceituno", 1000, "Unidad"],
+      ["90", "Aceituna 1/2", 2000, 4000, 1, "Aceituno", 5000, "Kg"],
+      ["91", "Mote Cocido", 800, 1500, 1, "Feria / Calera", 1200, "Kg"],
+      ["92", "Cebolla Escabeche", 650, 1500, 1, "Aceituno", 600, "Kg"],
+      ["93", "Aji Escabeche", 750, 1500, 1, "Aceituno", 1500, "Kg"],
+      ["103", "Charqui Grande", 1830, 3000, 1, "Feria / Calera", 1600, "Unidad"],
+      ["107", "Nuez", 1000, 2000, 1, "Turco", 3500, "Kg"],
+      ["108", "Pasa Rubia", 750, 1500, 1, "Turco", 750, "Unidad"],
+      ["109", "Pasa Negra", 800, 1500, 1, "Turco", 800, "Unidad"],
+      ["110", "Almendra", 1250, 2500, 1, "Turco", 12000, "Kg"],
+      ["114", "Comino", 350, 950, 1, "Turco", 350, "Unidad"],
+      ["115", "Oregano", 600, 1500, 1, "Aceituno", 600, "Kg"],
+      ["126", "Bicarbonato", 125, 390, 1, "Feria / Calera", 2000, "Tira"],
+      ["139", "Sucedaneo Limon", 500, 1490, 1, "Turco", 600, "Unidad"],
+      ["147", "Vinagre Manzana", 500, 1490, 1, "Turco", 600, "Unidad"],
+      ["148", "Pickle", 750, 1900, 1, "Aceituno", 500, "Unidad"],
+      ["307", "Huesillos", 1750, 4500, 1, "Turco", 5000, "Kg"],
+      ["308", "Cebolla Morada", 800, 2400, 1, "Feria / Calera", 17000, "Saco"],
+      ["309", "Pasta De Aji", 200, 400, 1, "Aceituno", 100, "Unidad"],
+      ["310", "Esparragos", 1000, 2000, 1, "Feria / Calera", 5000, "Atado"],
+      ["311", "Lechuga Hidroponica", 600, 1500, 1, "Hidropo", 700, "Unidad"],
+      ["312", "Pistacho", 2000, 3500, 1, "Turco", 8000, "Kg"],
+      ["314", "CARBON", 1300, 2500, 1, "Feria / Calera", 2000, "Saco"],
+      ["316", "Huevos Campo Bandeja", 4300, 7000, 1, "Feria / Calera", 4300, "Bandeja"],
+      ["318", "Mani Japones", 625, 2000, 1, "Turco", 5000, "Kg"],
+      ["321", "Aji Amarillo", 7000, 9900, 1, "Hidropo", 7000, "Kg"],
+      ["322", "Castaña Caju", 1750, 3500, 1, "Turco", 7000, "Kg"],
+      ["361", "Uva", 2500, 3500, 1, "Feria / Calera", 10000, "Caja"],
+      ["405", "Tomate Cherry Granel", 2500, 4700, 1, "Feria / Calera", 18000, "Caja"],
+      ["587", "Berenjenas", 400, 750, 1, "Feria / Calera", 400, "Unidad"],
+      ["650", "Promo Huevos", 3200, 4500, 1, "Feria / Calera", 3200, "Bandeja"],
+      ["786071096776", "Camaron 1k", 4490, 8500, 1, "Hidropo", 9500, "Unidad"],
+      // Productos adicionales del catálogo que el usuario puede activar/desactivar en LC cuando quiera
+      ["98", "Huevo Jumbo", 350, 490, 0, "", 350, "Unidad"],
+      ["101", "Miel 1 Kl", 3500, 6500, 0, "", 3500, "Unidad"],
+      ["102", "Miel 1/4Kl", 1000, 2200, 0, "", 1000, "Unidad"],
+      ["104", "Mix Frutos Secos", 1000, 2200, 0, "", 1000, "Unidad"],
+      ["106", "Mani Sabor/variedad", 750, 1500, 0, "", 750, "Unidad"],
+      ["116", "Aliño Completo", 600, 1500, 0, "", 600, "Unidad"],
+      ["118", "Merquen", 500, 1000, 0, "", 500, "Unidad"],
+      ["149", "Harina Tostada", 750, 1500, 0, "", 750, "Unidad"],
+      ["313", "Carbon Papel Aconcagua", 1800, 2800, 0, "", 1800, "Unidad"],
+      ["315", "Huevo Campo Und", 300, 350, 0, "", 300, "Unidad"],
+      ["360", "Mix Verde", 700, 1500, 0, "", 700, "Unidad"],
+      ["422", "Kilo Pan", 1650, 2300, 0, "", 1650, "Kg"],
+      ["450", "Media Beterraga", 500, 1000, 0, "", 500, "Unidad"],
+      ["494", "Bolsa Grande", 500, 1000, 0, "", 500, "Pack"],
+      ["495", "Bolsa Tela", 250, 500, 0, "", 250, "Unidad"],
+      ["500", "Bidon Agua", 1190, 2200, 0, "", 1190, "Unidad"],
+      ["502", "Clementina", 1800, 2500, 0, "", 1800, "Kg"],
+      ["545", "Medio Cilandro", 300, 750, 0, "", 300, "Atado"],
+      ["555", "Mizuna 100gr", 600, 1890, 0, "", 600, "Unidad"],
+      ["697", "Mix Berry", 1000, 2000, 0, "", 1000, "Unidad"],
+      ["699", "Chia Medio", 3000, 6990, 0, "", 3000, "Unidad"],
+      ["755", "Mix Pebres", 2000, 4000, 0, "", 2000, "Unidad"],
+      ["961", "Malla Cebolla", 3500, 7000, 0, "", 3500, "Malla"],
+      ["1505", "Bandeja Choclo", 1600, 2400, 0, "", 1600, "Bandeja"],
+      ["1900", "Leña Saco", 2800, 4500, 0, "", 2800, "Saco"],
+      ["2000", "Bolsa Porotos Verdes", 1000, 1500, 0, "", 1000, "Unidad"],
+      ["7790272001005", "Aceite Natura 900ml", 1990, 3290, 0, "", 1990, "Unidad"],
+      ["7801420001850", "Arroz Tucapel 900", 1000, 1690, 0, "", 1000, "Unidad"],
+      ["7801505231912", "Azucar Iansa", 1175, 1650, 0, "", 1175, "Unidad"],
+      ["7802900001308", "Leche Soprole 1litro", 1090, 1790, 0, "", 1090, "Unidad"],
+      ["7806500505006", "Papel Higenico Confort", 1082, 1990, 0, "", 1082, "Unidad"]
+    ];
+
+    const INITIAL_EXPENSE_CATEGORIES = [
+      { id: 'cat-1', name: 'LC 01-09', type: 'Lista LC Feria', amount: 1051600 },
+      { id: 'cat-2', name: 'LC 09-09', type: 'Lista LC Feria', amount: 963000 },
+      { id: 'cat-3', name: 'LC 12-09', type: 'Lista LC Feria', amount: 745800 },
+      { id: 'cat-4', name: 'LC 22-09', type: 'Lista LC Feria', amount: 812400 },
+      { id: 'cat-5', name: 'Abarrotes y Distribuidoras', type: 'Mercadería', amount: 1485000 },
+      { id: 'cat-6', name: 'Lácteos y Cecinas', type: 'Mercadería', amount: 690000 },
+      { id: 'cat-7', name: 'Panadería y Pastelería', type: 'Mercadería', amount: 420000 },
+      { id: 'cat-8', name: 'Bolsas y Envases', type: 'Insumos', amount: 185000 },
+      { id: 'cat-9', name: 'Arriendo Local', type: 'Gasto Fijo', amount: 850000 },
+      { id: 'cat-10', name: 'Luz, Agua e Internet', type: 'Servicios Básicos', amount: 215000 },
+      { id: 'cat-11', name: 'Sueldos y Turnos', type: 'Remuneraciones', amount: 1200000 },
+      { id: 'cat-12', name: 'Flete y Combustible Feria', type: 'Logística', amount: 160000 }
+    ];
+
+    const INITIAL_CAJA_DAYS = [
+      { id: 'c-1', date: '2026-09-01', efectivo: 345000, tarjeta: 289000, eleventaInc: 634000, eleventaGain: 218000 },
+      { id: 'c-2', date: '2026-09-02', efectivo: 312000, tarjeta: 265000, eleventaInc: 577000, eleventaGain: 196500 },
+      { id: 'c-3', date: '2026-09-03', efectivo: 389000, tarjeta: 310000, eleventaInc: 699000, eleventaGain: 241000 },
+      { id: 'c-4', date: '2026-09-04', efectivo: 410000, tarjeta: 352000, eleventaInc: 762000, eleventaGain: 264000 },
+      { id: 'c-5', date: '2026-09-05', efectivo: 495000, tarjeta: 428000, eleventaInc: 923000, eleventaGain: 319000 },
+      { id: 'c-6', date: '2026-09-06', efectivo: 530000, tarjeta: 461000, eleventaInc: 991000, eleventaGain: 345000 },
+      { id: 'c-7', date: '2026-09-08', efectivo: 328000, tarjeta: 274000, eleventaInc: 602000, eleventaGain: 205000 },
+      { id: 'c-8', date: '2026-09-09', efectivo: 364000, tarjeta: 301000, eleventaInc: 665000, eleventaGain: 229000 },
+      { id: 'c-9', date: '2026-09-10', efectivo: 372000, tarjeta: 318000, eleventaInc: 690000, eleventaGain: 238000 },
+      { id: 'c-10', date: '2026-09-11', efectivo: 445000, tarjeta: 389000, eleventaInc: 834000, eleventaGain: 289000 },
+      { id: 'c-11', date: '2026-09-12', efectivo: 518000, tarjeta: 442000, eleventaInc: 960000, eleventaGain: 332000 },
+      { id: 'c-12', date: '2026-09-13', efectivo: 560000, tarjeta: 490000, eleventaInc: 1050000, eleventaGain: 368000 },
+      { id: 'c-13', date: '2026-09-15', efectivo: 390000, tarjeta: 335000, eleventaInc: 725000, eleventaGain: 251000 },
+      { id: 'c-14', date: '2026-09-16', efectivo: 480000, tarjeta: 415000, eleventaInc: 895000, eleventaGain: 312000 },
+      { id: 'c-15', date: '2026-09-17', efectivo: 615000, tarjeta: 540000, eleventaInc: 1155000, eleventaGain: 405000 }
+    ];
+
+    const PURCHASE_UNITS = ['Caja', 'Saco', 'Malla', 'Kg', 'Unidad', 'Atado', 'Bandeja', 'Tira', 'Pack'];
+
+    let appState = {
+      currentMonthName: 'Septiembre 2026',
+      viewingMonthId: 'current',
+      archivedMonths: [],
+      catalog: [],
+      categories: [],
+      expensesLog: [],
+      cajaDays: [],
+      lcSubView: 'plan'
+    };
+
+    // =========================================================================
+    // PERSISTENCE, FORMATTING & UI UTILITIES
+    // =========================================================================
+    function formatCLP(val) {
+      const num = Math.round(Number(val) || 0);
+      return '$' + num.toLocaleString('es-CL');
+    }
+
+    function formatPct(val) {
+      const num = Number(val) || 0;
+      return num.toFixed(1) + '%';
+    }
+
+    function calcMarginPct(cost, price) {
+      const p = Number(price) || 0;
+      const c = Number(cost) || 0;
+      if (p <= 0) return 0;
+      return ((p - c) / p) * 100;
+    }
+
+    function getDefaultEquivalence(unit) {
+      switch ((unit || '').toLowerCase()) {
+        case 'caja': return 15;
+        case 'saco': return 25;
+        case 'malla': return 14;
+        case 'bandeja': return 1;
+        case 'tira': return 10;
+        case 'pack': return 6;
+        case 'atado': return 1;
+        case 'kg':
+        case 'unidad':
+        default: return 1;
+      }
+    }
+
+    function buildDefaultCatalog() {
+      return RAW_CATALOG_DATA.map((row, idx) => {
+        const [code, name, cost, salePrice, inLCFlag, provider, lastCost, lastUnit] = row;
+        const unit = lastUnit || 'Kg';
+        const equiv = getDefaultEquivalence(unit);
+        return {
+          id: 'prod-' + code + '-' + idx,
+          code: String(code),
+          name: String(name),
+          cost: Number(cost) || 0,
+          salePrice: Number(salePrice) || 0,
+          inLC: Boolean(inLCFlag),
+          lcData: {
+            buyToday: idx < 8, // 8 productos sugeridos listos como ejemplo inicial
+            provider: provider || 'Feria / Calera',
+            lastCost: Number(lastCost) || Number(cost) || 0,
+            lastUnit: unit,
+            qty: 1,
+            buyUnit: unit,
+            equiv: equiv,
+            buyCost: Number(lastCost) || Number(cost) || 0
+          }
+        };
+      });
+    }
+
+    function buildDefaultState() {
+      return {
+        currentMonthName: 'Septiembre 2026',
+        viewingMonthId: 'current',
+        archivedMonths: [],
+        catalog: buildDefaultCatalog(),
+        categories: JSON.parse(JSON.stringify(INITIAL_EXPENSE_CATEGORIES)),
+        expensesLog: [
+          {
+            id: 'exp-init-1',
+            date: '2026-09-09',
+            category: 'LC 09-09',
+            provider: 'Feria / Calera (Lista LC)',
+            docNumber: 'LC-09-09',
+            detail: 'Reposición frutas, verduras y abarrotes',
+            neto: 963000,
+            iva: 0,
+            total: 963000
+          },
+          {
+            id: 'exp-init-2',
+            date: '2026-09-01',
+            category: 'LC 01-09',
+            provider: 'Feria / Calera (Lista LC)',
+            docNumber: 'LC-01-09',
+            detail: 'Compra inicial mes de Septiembre',
+            neto: 1051600,
+            iva: 0,
+            total: 1051600
+          }
+        ],
+        cajaDays: JSON.parse(JSON.stringify(INITIAL_CAJA_DAYS)),
+        lcSubView: 'plan'
+      };
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+        const indicator = document.getElementById('save-indicator');
+        if (indicator) {
+          indicator.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span> Guardado`;
+        }
+      } catch (err) {
+        console.error('Error guardando estado en almacenamiento local:', err);
+      }
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          appState = buildDefaultState();
+          saveState();
+          return;
+        }
+        const parsed = JSON.parse(raw);
+        const def = buildDefaultState();
+        appState = {
+          currentMonthName: parsed.currentMonthName || 'Septiembre 2026',
+          viewingMonthId: parsed.viewingMonthId || 'current',
+          archivedMonths: Array.isArray(parsed.archivedMonths) ? parsed.archivedMonths : [],
+          catalog: Array.isArray(parsed.catalog) && parsed.catalog.length > 0 ? parsed.catalog : def.catalog,
+          categories: Array.isArray(parsed.categories) && parsed.categories.length > 0 ? parsed.categories : def.categories,
+          expensesLog: Array.isArray(parsed.expensesLog) ? parsed.expensesLog : def.expensesLog,
+          cajaDays: Array.isArray(parsed.cajaDays) ? parsed.cajaDays : def.cajaDays,
+          lcSubView: parsed.lcSubView || 'plan'
+        };
+      } catch (err) {
+        console.error('Error cargando estado guardado, restaurando valores iniciales:', err);
+        appState = buildDefaultState();
+      }
+    }
+
+    function getActiveMonthData() {
+      if (appState.viewingMonthId && appState.viewingMonthId !== 'current') {
+        const archived = appState.archivedMonths.find(m => m.id === appState.viewingMonthId);
+        if (archived) {
+          return {
+            isArchived: true,
+            name: archived.name,
+            categories: archived.categories || [],
+            expensesLog: archived.expensesLog || [],
+            cajaDays: archived.cajaDays || []
+          };
+        }
+      }
+      return {
+        isArchived: false,
+        name: appState.currentMonthName || 'Mes Actual',
+        categories: appState.categories,
+        expensesLog: appState.expensesLog,
+        cajaDays: appState.cajaDays
+      };
+    }
+
+    function renderMonthSelector() {
+      const sel = document.getElementById('month-selector');
+      const banner = document.getElementById('archive-view-banner');
+      const bannerName = document.getElementById('archive-banner-name');
+      if (!sel) return;
+
+      let optionsHtml = `<option value="current">${appState.currentMonthName} (Activo)</option>`;
+      appState.archivedMonths.forEach(m => {
+        optionsHtml += `<option value="${m.id}">📁 ${m.name} (Archivado)</option>`;
+      });
+      sel.innerHTML = optionsHtml;
+      sel.value = appState.viewingMonthId || 'current';
+
+      const activeData = getActiveMonthData();
+      if (banner && bannerName) {
+        if (activeData.isArchived) {
+          bannerName.textContent = activeData.name;
+          banner.classList.remove('hidden');
+        } else {
+          banner.classList.add('hidden');
+        }
+      }
+    }
+
+    function switchActiveMonth(monthId) {
+      appState.viewingMonthId = monthId;
+      saveState();
+      renderAll();
+      const activeData = getActiveMonthData();
+      showToast(activeData.isArchived
+        ? `Visualizando archivo histórico: ${activeData.name}`
+        : `Volviste al mes activo: ${activeData.name}`
+      );
+    }
+
+    function suggestNextMonthName(currentName) {
+      const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      const lower = (currentName || '').toLowerCase();
+      for (let i = 0; i < months.length; i++) {
+        if (lower.includes(months[i].toLowerCase())) {
+          const nextIdx = (i + 1) % 12;
+          const yearMatch = currentName.match(/\d{4}/);
+          let year = yearMatch ? parseInt(yearMatch[0], 10) : 2026;
+          if (i === 11) year += 1;
+          return `${months[nextIdx]} ${year}`;
+        }
+      }
+      return 'Nuevo Mes 2026';
+    }
+
+    function openNewMonthModal() {
+      if (appState.viewingMonthId !== 'current') {
+        switchActiveMonth('current');
+      }
+      const modal = document.getElementById('new-month-modal');
+      document.getElementById('nm-current-label').textContent = appState.currentMonthName;
+      document.getElementById('nm-next-name').value = suggestNextMonthName(appState.currentMonthName);
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeNewMonthModal() {
+      const modal = document.getElementById('new-month-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function confirmStartNewMonth(event) {
+      event.preventDefault();
+      const nextName = document.getElementById('nm-next-name').value.trim();
+      if (!nextName) return;
+
+      const totals = getTotals();
+
+      // 1. Archivar el mes actual completo
+      appState.archivedMonths.unshift({
+        id: 'month-' + Date.now(),
+        name: appState.currentMonthName,
+        archivedAt: new Date().toISOString().slice(0, 10),
+        summary: totals,
+        categories: JSON.parse(JSON.stringify(appState.categories)),
+        expensesLog: JSON.parse(JSON.stringify(appState.expensesLog)),
+        cajaDays: JSON.parse(JSON.stringify(appState.cajaDays))
+      });
+
+      // 2. Reiniciar contadores mensuales a $0 manteniendo estructura de partidas base
+      const baseCategories = appState.categories
+        .filter(c => c.type !== 'Lista LC Feria')
+        .map(c => ({ ...c, amount: 0 }));
+
+      appState.currentMonthName = nextName;
+      appState.viewingMonthId = 'current';
+      appState.categories = baseCategories;
+      appState.expensesLog = [];
+      appState.cajaDays = [];
+
+      // Limpiar selección diaria de compra en LC manteniendo intactos los productos fijos y el catálogo
+      appState.catalog.forEach(p => {
+        if (p.lcData) p.lcData.buyToday = false;
+      });
+
+      saveState();
+      closeNewMonthModal();
+      renderAll();
+      showToast(`¡Mes archivado! Iniciaste "${nextName}" desde $0 con tu Catálogo y Lista LC Fija intactos.`);
+    }
+
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const toast = document.createElement('div');
+      const colors = type === 'warning'
+        ? 'bg-amber-600 text-white border-amber-500'
+        : 'bg-slate-900 text-white border-emerald-500/50';
+      toast.className = `pointer-events-auto px-4 py-3 rounded-xl shadow-xl border text-xs sm:text-sm font-medium flex items-center gap-2.5 transition-all duration-300 ${colors}`;
+      toast.innerHTML = `
+        <span class="w-2 h-2 rounded-full ${type === 'warning' ? 'bg-amber-200' : 'bg-emerald-400'} shrink-0"></span>
+        <span>${message}</span>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(8px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 3600);
+    }
+
+    function customConfirm(title, message, onConfirm) {
+      const modal = document.getElementById('confirm-modal');
+      const titleEl = document.getElementById('modal-title');
+      const msgEl = document.getElementById('modal-message');
+      const btnCancel = document.getElementById('modal-cancel');
+      const btnConfirm = document.getElementById('modal-confirm');
+
+      titleEl.textContent = title;
+      msgEl.textContent = message;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      const cleanup = () => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        btnCancel.onclick = null;
+        btnConfirm.onclick = null;
+      };
+
+      btnCancel.onclick = cleanup;
+      btnConfirm.onclick = () => {
+        cleanup();
+        if (typeof onConfirm === 'function') onConfirm();
+      };
+    }
+
+    function askResetDemoData() {
+      customConfirm(
+        'Restaurar Datos Originales',
+        '¿Deseas restaurar el catálogo maestro, la Lista LC fija, los gastos y los cierres de caja originales de Septiembre? Se perderán los cambios locales no exportados.',
+        () => {
+          localStorage.removeItem(STORAGE_KEY);
+          appState = buildDefaultState();
+          saveState();
+          renderAll();
+          showToast('Datos originales de Septiembre restaurados correctamente.');
+        }
+      );
+    }
+
+    // =========================================================================
+    // NAVIGATION & GLOBAL TOTALS
+    // =========================================================================
+    function switchTab(tabId) {
+      const tabs = ['dashboard', 'scanner', 'lc', 'caja', 'catalog'];
+      tabs.forEach(t => {
+        const view = document.getElementById(`view-${t}`);
+        const btn = document.getElementById(`tab-btn-${t}`);
+        if (view) view.classList.toggle('hidden', t !== tabId);
+        if (btn) {
+          btn.classList.remove('tab-active', 'tab-inactive');
+          btn.classList.add(t === tabId ? 'tab-active' : 'tab-inactive');
+        }
+      });
+
+      if (tabId === 'dashboard') renderDashboard();
+      if (tabId === 'scanner') renderScannerTab();
+      if (tabId === 'lc') renderLCTab();
+      if (tabId === 'caja') renderCajaTab();
+      if (tabId === 'catalog') renderCatalogTab();
+    }
+
+    function getTotals() {
+      const active = getActiveMonthData();
+      const totalEfectivo = active.cajaDays.reduce((sum, d) => sum + (Number(d.efectivo) || 0), 0);
+      const totalTarjeta = active.cajaDays.reduce((sum, d) => sum + (Number(d.tarjeta) || 0), 0);
+      const totalRetiro = totalEfectivo + totalTarjeta;
+      const totalEleventa = active.cajaDays.reduce((sum, d) => sum + (Number(d.eleventaInc) || 0), 0);
+      const totalGainPOS = active.cajaDays.reduce((sum, d) => sum + (Number(d.eleventaGain) || 0), 0);
+      const totalGastos = active.categories.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+      const utilidadNeta = totalRetiro - totalGastos;
+      const margenNeto = totalRetiro > 0 ? (utilidadNeta / totalRetiro) * 100 : 0;
+      const margenPOS = totalEleventa > 0 ? (totalGainPOS / totalEleventa) * 100 : 0;
+
+      return {
+        totalEfectivo,
+        totalTarjeta,
+        totalRetiro,
+        totalEleventa,
+        totalGainPOS,
+        totalGastos,
+        utilidadNeta,
+        margenNeto,
+        margenPOS
+      };
+    }
+
+    // =========================================================================
+    // TAB 1: TABLERO Y UTILIDAD
+    // =========================================================================
+    function renderDashboard() {
+      const active = getActiveMonthData();
+      const t = getTotals();
+      document.getElementById('kpi-retiro').textContent = formatCLP(t.totalRetiro);
+      document.getElementById('kpi-retiro-sub').textContent = `Efectivo: ${formatCLP(t.totalEfectivo)} · Tarjeta: ${formatCLP(t.totalTarjeta)}`;
+
+      document.getElementById('kpi-eleventa').textContent = formatCLP(t.totalEleventa);
+      document.getElementById('kpi-eleventa-sub').textContent = `Ganancia Bruta POS: ${formatCLP(t.totalGainPOS)} (${formatPct(t.margenPOS)})`;
+
+      document.getElementById('kpi-gastos').textContent = formatCLP(t.totalGastos);
+      document.getElementById('kpi-gastos-sub').textContent = `${active.categories.length} partidas en ${active.name}`;
+
+      document.getElementById('kpi-utilidad').textContent = formatCLP(t.utilidadNeta);
+      document.getElementById('kpi-margin-badge').textContent = formatPct(t.margenNeto);
+
+      const gastosPct = t.totalRetiro > 0 ? Math.min(100, Math.max(0, (t.totalGastos / t.totalRetiro) * 100)) : 0;
+      const utilPct = t.totalRetiro > 0 ? Math.min(100, Math.max(0, (t.utilidadNeta / t.totalRetiro) * 100)) : 0;
+
+      document.getElementById('bar-retiro-label').textContent = formatCLP(t.totalRetiro);
+      document.getElementById('bar-gastos-pct').textContent = formatPct(gastosPct);
+      document.getElementById('bar-gastos-label').textContent = formatCLP(t.totalGastos);
+      document.getElementById('bar-gastos-fill').style.width = `${gastosPct.toFixed(1)}%`;
+
+      document.getElementById('bar-util-pct').textContent = formatPct(t.margenNeto);
+      document.getElementById('bar-util-label').textContent = formatCLP(t.utilidadNeta);
+      document.getElementById('bar-util-fill').style.width = `${utilPct.toFixed(1)}%`;
+
+      const query = (document.getElementById('dashboard-cat-search')?.value || '').trim().toLowerCase();
+      const sortedCats = [...active.categories]
+        .sort((a, b) => b.amount - a.amount)
+        .filter(c => !query || c.name.toLowerCase().includes(query) || c.type.toLowerCase().includes(query));
+
+      const tbody = document.getElementById('dashboard-categories-body');
+      if (sortedCats.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-slate-400 text-xs">No se encontraron partidas para "${query}"</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = sortedCats.map(c => {
+        const share = t.totalGastos > 0 ? (c.amount / t.totalGastos) * 100 : 0;
+        const badgeColor = c.type === 'Lista LC Feria'
+          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+          : c.type === 'Gasto Fijo' || c.type === 'Remuneraciones'
+          ? 'bg-amber-50 text-amber-800 border-amber-200'
+          : 'bg-slate-100 text-slate-700 border-slate-200';
+        return `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3 px-4 font-semibold text-slate-900">${c.name}</td>
+            <td class="py-3 px-4">
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-medium border ${badgeColor}">${c.type}</span>
+            </td>
+            <td class="py-3 px-4 text-right font-bold text-slate-900">${formatCLP(c.amount)}</td>
+            <td class="py-3 px-4 text-right text-xs font-semibold text-slate-500">${formatPct(share)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // =========================================================================
+    // TAB 2: ESCÁNER Y REGISTRO DE GASTOS
+    // =========================================================================
+    function renderScannerTab() {
+      const active = getActiveMonthData();
+      const catSelect = document.getElementById('exp-category');
+      if (catSelect) {
+        const currentVal = catSelect.value;
+        catSelect.innerHTML = active.categories
+          .map(c => `<option value="${c.name}">${c.name} (${c.type})</option>`)
+          .join('') + `<option value="__NEW__">+ Crear nueva categoría...</option>`;
+        if (currentVal && currentVal !== '__NEW__') {
+          catSelect.value = currentVal;
+        }
+      }
+
+      const dateInput = document.getElementById('exp-date');
+      if (dateInput && !dateInput.value) {
+        dateInput.value = new Date().toISOString().slice(0, 10);
+      }
+
+      document.getElementById('expenses-log-count').textContent = `${active.expensesLog.length} registros (${active.name})`;
+      const tbody = document.getElementById('expenses-log-body');
+      if (active.expensesLog.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-slate-400 text-sm">Aún no hay documentos registrados en ${active.name}.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = active.expensesLog.map(exp => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="py-3 px-4 text-xs font-medium text-slate-600 whitespace-nowrap">${exp.date}</td>
+          <td class="py-3 px-4">
+            <span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200">${exp.category}</span>
+          </td>
+          <td class="py-3 px-4">
+            <div class="font-semibold text-slate-900 text-xs sm:text-sm">${exp.provider}</div>
+            <div class="text-[11px] text-slate-400 font-mono">${exp.docNumber || 'S/N'}</div>
+          </td>
+          <td class="py-3 px-4 text-xs text-slate-600 max-w-xs truncate">${exp.detail || '-'}</td>
+          <td class="py-3 px-4 text-right font-extrabold text-rose-600 whitespace-nowrap">${formatCLP(exp.total)}</td>
+          <td class="py-3 px-4 text-center">
+            ${active.isArchived
+              ? '<span class="text-[11px] text-slate-400">Archivado</span>'
+              : `<button onclick="deleteExpenseEntry('${exp.id}')" class="text-xs text-slate-400 hover:text-rose-600 font-semibold px-2 py-1 rounded-lg hover:bg-rose-50 transition" title="Eliminar y descontar de Resumen">Eliminar</button>`
+            }
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function toggleNewCategoryInput(val) {
+      const input = document.getElementById('exp-new-category');
+      if (!input) return;
+      if (val === '__NEW__') {
+        input.classList.remove('hidden');
+        input.required = true;
+        input.focus();
+      } else {
+        input.classList.add('hidden');
+        input.required = false;
+      }
+    }
+
+    function handleReceiptPreview(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        document.getElementById('receipt-preview-img').src = e.target.result;
+        document.getElementById('receipt-preview-box').classList.remove('hidden');
+        showToast('Imagen de documento cargada. Completa los datos y guarda.');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function saveExpenseEntry(event) {
+      event.preventDefault();
+      if (getActiveMonthData().isArchived) {
+        showToast('Estás viendo un mes archivado. Cambia al mes activo para registrar nuevos gastos.', 'warning');
+        return;
+      }
+      let categoryName = document.getElementById('exp-category').value;
+      if (categoryName === '__NEW__') {
+        categoryName = document.getElementById('exp-new-category').value.trim();
+        if (!categoryName) return;
+      }
+
+      const date = document.getElementById('exp-date').value;
+      const provider = document.getElementById('exp-provider').value.trim();
+      const docNumber = document.getElementById('exp-doc').value.trim() || 'S/N';
+      const total = Number(document.getElementById('exp-total').value) || 0;
+      const detail = document.getElementById('exp-detail').value.trim();
+
+      if (total <= 0) {
+        showToast('Ingresa un monto válido mayor a $0.', 'warning');
+        return;
+      }
+
+      let catObj = appState.categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
+      if (!catObj) {
+        catObj = { id: 'cat-' + Date.now(), name: categoryName, type: 'Gasto Operativo', amount: 0 };
+        appState.categories.push(catObj);
+      }
+      catObj.amount += total;
+
+      appState.expensesLog.unshift({
+        id: 'exp-' + Date.now(),
+        date,
+        category: catObj.name,
+        provider,
+        docNumber,
+        detail,
+        neto: total,
+        iva: 0,
+        total
+      });
+
+      document.getElementById('expense-form').reset();
+      document.getElementById('exp-new-category').classList.add('hidden');
+      document.getElementById('receipt-preview-box').classList.add('hidden');
+      document.getElementById('exp-date').value = new Date().toISOString().slice(0, 10);
+
+      saveState();
+      renderScannerTab();
+      renderDashboard();
+      showToast(`Gasto de ${formatCLP(total)} registrado en "${catObj.name}".`);
+    }
+
+    function deleteExpenseEntry(id) {
+      const idx = appState.expensesLog.findIndex(e => e.id === id);
+      if (idx === -1) return;
+      const exp = appState.expensesLog[idx];
+
+      customConfirm(
+        'Eliminar Documento',
+        `¿Eliminar el gasto de ${formatCLP(exp.total)} (${exp.provider}) y descontarlo de "${exp.category}"?`,
+        () => {
+          const catObj = appState.categories.find(c => c.name === exp.category);
+          if (catObj) {
+            catObj.amount = Math.max(0, catObj.amount - exp.total);
+          }
+          appState.expensesLog.splice(idx, 1);
+          saveState();
+          renderScannerTab();
+          renderDashboard();
+          showToast('Registro eliminado y saldo actualizado.');
+        }
+      );
+    }
+
+    // =========================================================================
+    // TAB 3: LISTA LC FIJA (VINCULADA AL CATÁLOGO) Y PLANIFICACIÓN DE COMPRA
+    // =========================================================================
+    function getFixedLCProducts() {
+      return appState.catalog.filter(p => p.inLC);
+    }
+
+    function setLCSubView(viewName) {
+      appState.lcSubView = viewName;
+      saveState();
+
+      const planView = document.getElementById('lc-view-plan');
+      const shopView = document.getElementById('lc-view-shopping');
+      const btnPlan = document.getElementById('lc-subbtn-plan');
+      const btnShop = document.getElementById('lc-subbtn-shopping');
+
+      if (viewName === 'shopping') {
+        planView.classList.add('hidden');
+        shopView.classList.remove('hidden');
+        btnShop.className = 'px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white shadow-xs transition';
+        btnPlan.className = 'px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition';
+        renderLCShoppingList();
+      } else {
+        shopView.classList.add('hidden');
+        planView.classList.remove('hidden');
+        btnPlan.className = 'px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white shadow-xs transition';
+        btnShop.className = 'px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition';
+        renderLCItems();
+      }
+    }
+
+    function renderLCTab() {
+      const fixedProducts = getFixedLCProducts();
+      const badge = document.getElementById('lc-badge-count');
+      if (badge) badge.textContent = fixedProducts.length;
+
+      const sessionInput = document.getElementById('lc-session-name');
+      if (sessionInput && !sessionInput.value) {
+        const now = new Date();
+        const dd = String(now.getDate()).padStart(2, '0');
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        sessionInput.value = `LC ${dd}-${mm}`;
+      }
+
+      // Populate unique providers from fixed LC products
+      const provSelect = document.getElementById('lc-provider-filter');
+      if (provSelect) {
+        const prevProv = provSelect.value || 'ALL';
+        const providers = [...new Set(fixedProducts.map(p => (p.lcData.provider || 'Feria / Calera').trim()).filter(Boolean))].sort();
+        provSelect.innerHTML = `<option value="ALL">Todos los proveedores (${providers.length})</option>` +
+          providers.map(pr => `<option value="${pr}">${pr}</option>`).join('');
+        if ([...provSelect.options].some(o => o.value === prevProv)) {
+          provSelect.value = prevProv;
+        }
+      }
+
+      updateLCKPIs();
+      setLCSubView(appState.lcSubView || 'plan');
+    }
+
+    function updateLCKPIs() {
+      const fixedProducts = getFixedLCProducts();
+      const planned = fixedProducts.filter(p => p.lcData.buyToday);
+      const totalPlanned = planned.reduce((sum, p) => sum + ((Number(p.lcData.qty) || 0) * (Number(p.lcData.buyCost) || 0)), 0);
+
+      const elFixed = document.getElementById('lc-kpi-fixed');
+      const elSelected = document.getElementById('lc-kpi-selected');
+      const elShopCount = document.getElementById('lc-shopping-count');
+      const elTotal = document.getElementById('lc-kpi-total');
+
+      if (elFixed) elFixed.textContent = fixedProducts.length;
+      if (elSelected) elSelected.textContent = planned.length;
+      if (elShopCount) elShopCount.textContent = planned.length;
+      if (elTotal) elTotal.textContent = formatCLP(totalPlanned);
+    }
+
+    function getFilteredFixedLC() {
+      const search = (document.getElementById('lc-product-search')?.value || '').trim().toLowerCase();
+      const planFilter = document.getElementById('lc-plan-filter')?.value || 'all';
+      const provFilter = document.getElementById('lc-provider-filter')?.value || 'ALL';
+
+      return getFixedLCProducts().filter(p => {
+        const matchesSearch = !search ||
+          p.name.toLowerCase().includes(search) ||
+          p.code.toLowerCase().includes(search) ||
+          (p.lcData.provider || '').toLowerCase().includes(search);
+        const matchesPlan = planFilter === 'all'
+          ? true
+          : planFilter === 'buy'
+          ? Boolean(p.lcData.buyToday)
+          : !p.lcData.buyToday;
+        const matchesProv = provFilter === 'ALL' || (p.lcData.provider || 'Feria / Calera').trim() === provFilter;
+        return matchesSearch && matchesPlan && matchesProv;
+      });
+    }
+
+    function renderLCItems() {
+      const tbody = document.getElementById('lc-items-body');
+      if (!tbody) return;
+      const items = getFilteredFixedLC();
+
+      if (items.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="11" class="py-10 text-center text-slate-400">
+              No hay productos fijos en la Lista LC que coincidan con el filtro. Puedes fijar productos desde <strong>Catálogo Oficial</strong>.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = items.map(p => {
+        const d = p.lcData;
+        const qty = Number(d.qty) || 0;
+        const buyCost = Number(d.buyCost) || 0;
+        const equiv = Math.max(0.01, Number(d.equiv) || 1);
+        const realUnitCost = buyCost / equiv;
+        const subtotal = qty * buyCost;
+        const salePrice = Number(p.salePrice) || 0;
+        const estMargin = salePrice > 0 ? ((salePrice - realUnitCost) / salePrice) * 100 : 0;
+
+        const rowHighlight = d.buyToday
+          ? 'bg-emerald-50/70 hover:bg-emerald-50'
+          : 'bg-white hover:bg-slate-50 opacity-85 hover:opacity-100';
+
+        const marginBadgeClass = estMargin >= 30
+          ? 'bg-emerald-100 text-emerald-800'
+          : estMargin >= 15
+          ? 'bg-amber-100 text-amber-800'
+          : 'bg-rose-100 text-rose-700';
+
+        const unitOptions = PURCHASE_UNITS.map(u =>
+          `<option value="${u}" ${d.buyUnit === u ? 'selected' : ''}>${u}</option>`
+        ).join('');
+
+        return `
+          <tr class="${rowHighlight} transition">
+            <!-- Check Planificación Comprar Hoy -->
+            <td class="py-2.5 px-3 text-center">
+              <input type="checkbox" ${d.buyToday ? 'checked' : ''} onchange="toggleLCBuy('${p.id}', this.checked)"
+                class="w-5 h-5 rounded-md text-emerald-600 focus:ring-emerald-500 cursor-pointer border-slate-300"
+                title="Seleccionar para comprar hoy" />
+            </td>
+
+            <!-- Producto + Código -->
+            <td class="py-2.5 px-3">
+              <div class="font-bold text-slate-900 leading-tight">${p.name}</div>
+              <div class="text-[11px] font-mono text-slate-400">PLU ${p.code}</div>
+            </td>
+
+            <!-- Proveedor -->
+            <td class="py-2.5 px-3">
+              <input type="text" value="${d.provider || ''}" onchange="updateLCField('${p.id}', 'provider', this.value)"
+                class="w-28 px-2 py-1 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </td>
+
+            <!-- Costo Anterior + Unidad Anterior -->
+            <td class="py-2.5 px-3 bg-amber-50/50">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="font-bold text-slate-800 text-xs">${formatCLP(d.lastCost)}</span>
+                <span class="px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase bg-amber-200/80 text-amber-950 border border-amber-300">
+                  ${d.lastUnit || 'Unidad'}
+                </span>
+              </div>
+              <div class="text-[10px] text-slate-500 mt-0.5">Último ingreso</div>
+            </td>
+
+            <!-- Cantidad a Comprar -->
+            <td class="py-2.5 px-3 text-right">
+              <input type="number" min="0" step="0.5" value="${qty}" oninput="updateLCField('${p.id}', 'qty', this.value)"
+                class="w-16 px-2 py-1 rounded-lg border border-slate-300 text-right text-xs font-bold text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </td>
+
+            <!-- Unidad de Compra -->
+            <td class="py-2.5 px-3">
+              <select onchange="updateLCBuyUnit('${p.id}', this.value)"
+                class="px-2 py-1 rounded-lg border border-slate-300 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                ${unitOptions}
+              </select>
+            </td>
+
+            <!-- Equivalencia -->
+            <td class="py-2.5 px-3 text-right">
+              <input type="number" min="0.1" step="0.5" value="${equiv}" oninput="updateLCField('${p.id}', 'equiv', this.value)"
+                class="w-16 px-2 py-1 rounded-lg border border-slate-200 text-right text-xs text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                title="Cuántos Kg o unidades trae esta compra" />
+            </td>
+
+            <!-- Precio Compra -->
+            <td class="py-2.5 px-3 text-right">
+              <input type="number" min="0" step="10" value="${buyCost}" oninput="updateLCField('${p.id}', 'buyCost', this.value)"
+                class="w-24 px-2 py-1 rounded-lg border border-slate-300 text-right text-xs font-bold text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </td>
+
+            <!-- Costo Unitario Real -->
+            <td class="py-2.5 px-3 text-right bg-emerald-50/40 font-bold text-emerald-800 text-xs whitespace-nowrap">
+              ${formatCLP(realUnitCost)} <span class="text-[10px] font-normal text-slate-500">/u</span>
+            </td>
+
+            <!-- P. Venta Catálogo (Recordatorio + Margen Estimado) -->
+            <td class="py-2.5 px-3 text-right bg-sky-50/60 whitespace-nowrap">
+              <div class="font-extrabold text-sky-900 text-xs">${formatCLP(salePrice)}</div>
+              <span class="inline-block px-1.5 py-0.2 rounded text-[10px] font-bold ${marginBadgeClass}">
+                Mg ${formatPct(estMargin)}
+              </span>
+            </td>
+
+            <!-- Subtotal -->
+            <td class="py-2.5 px-3 text-right font-extrabold ${d.buyToday ? 'text-slate-900' : 'text-slate-400'} whitespace-nowrap">
+              ${formatCLP(subtotal)}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function toggleLCBuy(productId, checked) {
+      const prod = appState.catalog.find(p => p.id === productId);
+      if (!prod) return;
+      prod.lcData.buyToday = Boolean(checked);
+      if (checked && (!prod.lcData.qty || Number(prod.lcData.qty) <= 0)) {
+        prod.lcData.qty = 1;
+      }
+      saveState();
+      updateLCKPIs();
+      renderLCItems();
+    }
+
+    function toggleSelectAllLC(checked) {
+      const visible = getFilteredFixedLC();
+      visible.forEach(p => {
+        p.lcData.buyToday = checked;
+        if (checked && (!p.lcData.qty || Number(p.lcData.qty) <= 0)) {
+          p.lcData.qty = 1;
+        }
+      });
+      saveState();
+      updateLCKPIs();
+      renderLCItems();
+      showToast(checked ? `${visible.length} productos marcados para comprar.` : 'Selección de compra limpia.');
+    }
+
+    function updateLCField(productId, field, rawVal) {
+      const prod = appState.catalog.find(p => p.id === productId);
+      if (!prod) return;
+      if (field === 'provider') {
+        prod.lcData.provider = rawVal;
+      } else {
+        prod.lcData[field] = Number(rawVal) || 0;
+        if (field === 'qty' && Number(rawVal) > 0) {
+          prod.lcData.buyToday = true;
+        }
+      }
+      saveState();
+      updateLCKPIs();
+      if (field !== 'provider') {
+        renderLCItems();
+      }
+    }
+
+    function updateLCBuyUnit(productId, newUnit) {
+      const prod = appState.catalog.find(p => p.id === productId);
+      if (!prod) return;
+      prod.lcData.buyUnit = newUnit;
+      prod.lcData.equiv = getDefaultEquivalence(newUnit);
+      saveState();
+      renderLCItems();
+    }
+
+    function renderLCShoppingList() {
+      const container = document.getElementById('lc-shopping-grouped');
+      const planned = getFixedLCProducts().filter(p => p.lcData.buyToday);
+
+      if (planned.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full bg-white rounded-2xl p-10 border border-slate-200 text-center space-y-2">
+            <p class="text-sm font-bold text-slate-700">No has seleccionado ningún producto para comprar hoy.</p>
+            <p class="text-xs text-slate-500">Vuelve a "Planificar y Cotizar Lista Fija" y marca la casilla <strong>Comprar</strong> en los productos que necesites.</p>
+          </div>
+        `;
+        return;
+      }
+
+      const groups = {};
+      planned.forEach(p => {
+        const prov = (p.lcData.provider || 'Feria / Calera').trim() || 'Feria / Calera';
+        if (!groups[prov]) groups[prov] = [];
+        groups[prov].push(p);
+      });
+
+      container.innerHTML = Object.entries(groups).map(([prov, items]) => {
+        const groupTotal = items.reduce((s, p) => s + ((Number(p.lcData.qty) || 0) * (Number(p.lcData.buyCost) || 0)), 0);
+        return `
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <div class="px-4 py-3 bg-slate-900 text-white flex items-center justify-between">
+              <div class="font-bold text-sm">🚚 ${prov}</div>
+              <span class="text-xs font-extrabold text-emerald-400">${formatCLP(groupTotal)}</span>
+            </div>
+            <div class="divide-y divide-slate-100">
+              ${items.map(p => {
+                const d = p.lcData;
+                const sub = (Number(d.qty) || 0) * (Number(d.buyCost) || 0);
+                return `
+                  <div class="px-4 py-2.5 flex items-center justify-between gap-2 text-xs">
+                    <div>
+                      <div class="font-bold text-slate-900">${p.name}</div>
+                      <div class="text-[11px] text-slate-500">
+                        Ant: ${formatCLP(d.lastCost)} [${d.lastUnit}] · P.Venta Cat: <strong class="text-sky-700">${formatCLP(p.salePrice)}</strong>
+                      </div>
+                    </div>
+                    <div class="text-right shrink-0">
+                      <div class="font-extrabold text-emerald-700">${d.qty} ${d.buyUnit}</div>
+                      <div class="text-[11px] text-slate-600">${formatCLP(sub)}</div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function closeAndTransferLC() {
+      if (getActiveMonthData().isArchived) {
+        showToast('Estás viendo un mes archivado. Vuelve al mes activo para registrar compras LC.', 'warning');
+        return;
+      }
+      const planned = getFixedLCProducts().filter(p => p.lcData.buyToday && (Number(p.lcData.qty) || 0) > 0);
+      if (planned.length === 0) {
+        showToast('Marca al menos un producto con "Comprar" y cantidad mayor a 0 antes de registrar.', 'warning');
+        return;
+      }
+
+      const sessionName = document.getElementById('lc-session-name').value.trim() || 'LC Jornada';
+      const updateCatalog = document.getElementById('lc-update-catalog-cost').checked;
+      const totalLC = planned.reduce((s, p) => s + ((Number(p.lcData.qty) || 0) * (Number(p.lcData.buyCost) || 0)), 0);
+
+      customConfirm(
+        `Registrar Compra "${sessionName}"`,
+        `Se registrará un gasto por ${formatCLP(totalLC)} (${planned.length} productos seleccionados) en la Hoja Resumen. Todos los productos seguirán fijos en tu Lista LC.`,
+        () => {
+          // 1. Add or update category in Hoja Resumen
+          let catObj = appState.categories.find(c => c.name.toLowerCase() === sessionName.toLowerCase());
+          if (!catObj) {
+            catObj = { id: 'cat-lc-' + Date.now(), name: sessionName, type: 'Lista LC Feria', amount: 0 };
+            appState.categories.unshift(catObj);
+          }
+          catObj.amount += totalLC;
+
+          // 2. Log in expenses history
+          const today = new Date().toISOString().slice(0, 10);
+          appState.expensesLog.unshift({
+            id: 'exp-lc-' + Date.now(),
+            date: today,
+            category: sessionName,
+            provider: 'Feria / Proveedores (Lista LC)',
+            docNumber: sessionName,
+            detail: `Compra planificada (${planned.length} productos LC)`,
+            neto: totalLC,
+            iva: 0,
+            total: totalLC
+          });
+
+          // 3. Update lastCost + lastUnit on each purchased item, and uncheck buyToday (keeping items FIXED in LC)
+          planned.forEach(p => {
+            const d = p.lcData;
+            const buyCost = Number(d.buyCost) || 0;
+            const equiv = Math.max(0.01, Number(d.equiv) || 1);
+            if (updateCatalog && buyCost > 0) {
+              d.lastCost = buyCost;
+              d.lastUnit = d.buyUnit || 'Unidad';
+              p.cost = Math.round(buyCost / equiv);
+            }
+            d.buyToday = false;
+          });
+
+          saveState();
+          renderAll();
+          showToast(`Compra "${sessionName}" por ${formatCLP(totalLC)} registrada. Lista LC fija intacta.`);
+        }
+      );
+    }
+
+    // =========================================================================
+    // TAB 4: CUADRE CAJA Y ELEVENTA
+    // =========================================================================
+    function updateCajaPreview() {
+      const ef = Number(document.getElementById('caja-efectivo')?.value) || 0;
+      const tj = Number(document.getElementById('caja-tarjeta')?.value) || 0;
+      const el = Number(document.getElementById('caja-eleventa')?.value) || 0;
+      const tot = ef + tj;
+      const diff = tot - el;
+
+      document.getElementById('caja-preview-retiro').textContent = formatCLP(tot);
+      const diffEl = document.getElementById('caja-preview-diff');
+      diffEl.textContent = (diff > 0 ? '+' : '') + formatCLP(diff);
+      diffEl.className = diff === 0
+        ? 'font-bold text-emerald-700'
+        : diff > 0
+        ? 'font-bold text-sky-700'
+        : 'font-bold text-rose-600';
+    }
+
+    function saveCajaEntry(event) {
+      event.preventDefault();
+      if (getActiveMonthData().isArchived) {
+        showToast('Estás viendo un mes archivado. Cambia al mes activo para registrar cierres de caja.', 'warning');
+        return;
+      }
+      const date = document.getElementById('caja-date').value;
+      const efectivo = Number(document.getElementById('caja-efectivo').value) || 0;
+      const tarjeta = Number(document.getElementById('caja-tarjeta').value) || 0;
+      const eleventaInc = Number(document.getElementById('caja-eleventa').value) || 0;
+      const eleventaGain = Number(document.getElementById('caja-gain').value) || 0;
+
+      const existing = appState.cajaDays.find(d => d.date === date);
+      if (existing) {
+        existing.efectivo = efectivo;
+        existing.tarjeta = tarjeta;
+        existing.eleventaInc = eleventaInc;
+        existing.eleventaGain = eleventaGain;
+        showToast(`Cierre del ${date} actualizado.`);
+      } else {
+        appState.cajaDays.unshift({
+          id: 'caja-' + Date.now(),
+          date,
+          efectivo,
+          tarjeta,
+          eleventaInc,
+          eleventaGain
+        });
+        showToast(`Cierre del ${date} guardado.`);
+      }
+
+      document.getElementById('caja-form').reset();
+      document.getElementById('caja-date').value = new Date().toISOString().slice(0, 10);
+      updateCajaPreview();
+      saveState();
+      renderCajaTab();
+      renderDashboard();
+    }
+
+    function renderCajaTab() {
+      const active = getActiveMonthData();
+      if (!document.getElementById('caja-date').value) {
+        document.getElementById('caja-date').value = new Date().toISOString().slice(0, 10);
+      }
+
+      const tbody = document.getElementById('caja-table-body');
+      document.getElementById('caja-days-count').textContent = `${active.cajaDays.length} días registrados (${active.name})`;
+
+      let totEfec = 0, totTarj = 0, totRet = 0, totElev = 0, totDiff = 0, totGain = 0;
+
+      if (active.cajaDays.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="py-8 text-center text-slate-400 text-sm">Sin cierres diarios registrados en ${active.name} ($0).</td></tr>`;
+      } else {
+        tbody.innerHTML = active.cajaDays.map(d => {
+          const totalRet = d.efectivo + d.tarjeta;
+          const diff = totalRet - d.eleventaInc;
+          const margin = d.eleventaInc > 0 ? (d.eleventaGain / d.eleventaInc) * 100 : 0;
+
+          totEfec += d.efectivo;
+          totTarj += d.tarjeta;
+          totRet += totalRet;
+          totElev += d.eleventaInc;
+          totDiff += diff;
+          totGain += d.eleventaGain;
+
+          const diffBadge = diff === 0
+            ? `<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">$0 Cuadrado</span>`
+            : diff > 0
+            ? `<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-sky-100 text-sky-800">+${formatCLP(diff)}</span>`
+            : `<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-700">${formatCLP(diff)}</span>`;
+
+          return `
+            <tr class="hover:bg-slate-50">
+              <td class="py-2.5 px-3.5 text-xs font-semibold text-slate-700 whitespace-nowrap">${d.date}</td>
+              <td class="py-2.5 px-3.5 text-right text-xs text-slate-600">${formatCLP(d.efectivo)}</td>
+              <td class="py-2.5 px-3.5 text-right text-xs text-slate-600">${formatCLP(d.tarjeta)}</td>
+              <td class="py-2.5 px-3.5 text-right font-bold text-slate-900">${formatCLP(totalRet)}</td>
+              <td class="py-2.5 px-3.5 text-right text-xs font-medium text-slate-700">${formatCLP(d.eleventaInc)}</td>
+              <td class="py-2.5 px-3.5 text-right">${diffBadge}</td>
+              <td class="py-2.5 px-3.5 text-right text-xs font-semibold text-emerald-700">${formatCLP(d.eleventaGain)}</td>
+              <td class="py-2.5 px-3.5 text-right text-xs text-slate-600">${formatPct(margin)}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      if (active.cajaDays.length > 0) {
+        const totalMargin = totElev > 0 ? (totGain / totElev) * 100 : 0;
+        tbody.innerHTML += `
+          <tr class="bg-slate-900 text-white font-bold text-xs">
+            <td class="py-3 px-3.5">TOTAL ACUMULADO</td>
+            <td class="py-3 px-3.5 text-right">${formatCLP(totEfec)}</td>
+            <td class="py-3 px-3.5 text-right">${formatCLP(totTarj)}</td>
+            <td class="py-3 px-3.5 text-right text-emerald-400">${formatCLP(totRet)}</td>
+            <td class="py-3 px-3.5 text-right">${formatCLP(totElev)}</td>
+            <td class="py-3 px-3.5 text-right">${(totDiff > 0 ? '+' : '') + formatCLP(totDiff)}</td>
+            <td class="py-3 px-3.5 text-right text-emerald-400">${formatCLP(totGain)}</td>
+            <td class="py-3 px-3.5 text-right">${formatPct(totalMargin)}</td>
+          </tr>
+        `;
+      }
+    }
+
+    // =========================================================================
+    // TAB 5: CATÁLOGO OFICIAL (CON OPCIÓN PARA FIJAR EN LISTA LC)
+    // =========================================================================
+    function renderCatalogTab() {
+      const search = (document.getElementById('catalog-search')?.value || '').trim().toLowerCase();
+      const lcFilter = document.getElementById('catalog-lc-filter')?.value || 'all';
+
+      const filtered = appState.catalog.filter(p => {
+        const matchesText = !search ||
+          p.name.toLowerCase().includes(search) ||
+          p.code.toLowerCase().includes(search) ||
+          (p.lcData?.provider || '').toLowerCase().includes(search);
+        const matchesLC = lcFilter === 'all'
+          ? true
+          : lcFilter === 'in_lc'
+          ? Boolean(p.inLC)
+          : !p.inLC;
+        return matchesText && matchesLC;
+      });
+
+      const fixedCount = getFixedLCProducts().length;
+      document.getElementById('catalog-count-badge').textContent = `${filtered.length} mostrados · ${fixedCount} fijos en LC`;
+
+      const tbody = document.getElementById('catalog-table-body');
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-400">No se encontraron productos en el catálogo.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(p => {
+        const margin = calcMarginPct(p.cost, p.salePrice);
+        const marginClass = margin >= 35
+          ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+          : margin >= 20
+          ? 'text-amber-700 bg-amber-50 border-amber-200'
+          : 'text-rose-700 bg-rose-50 border-rose-200';
+
+        return `
+          <tr class="${p.inLC ? 'bg-emerald-50/35' : 'bg-white'} hover:bg-slate-50 transition">
+            <!-- Checkbox Fijar en Lista LC -->
+            <td class="py-2.5 px-3 text-center">
+              <label class="inline-flex items-center justify-center gap-1.5 cursor-pointer select-none">
+                <input type="checkbox" ${p.inLC ? 'checked' : ''} onchange="toggleCatalogLC('${p.id}', this.checked)"
+                  class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" />
+                <span class="text-[11px] font-bold ${p.inLC ? 'text-emerald-700' : 'text-slate-400'}">
+                  ${p.inLC ? 'Fijo' : 'No'}
+                </span>
+              </label>
+            </td>
+
+            <td class="py-2.5 px-3 font-mono text-xs text-slate-500">${p.code}</td>
+            <td class="py-2.5 px-3 font-bold text-slate-900">${p.name}</td>
+
+            <!-- Editable P. Costo Base -->
+            <td class="py-2.5 px-3 text-right">
+              <input type="number" min="0" step="10" value="${p.cost}" onchange="updateCatalogPrice('${p.id}', 'cost', this.value)"
+                class="w-24 px-2 py-1 rounded-lg border border-slate-200 text-right text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </td>
+
+            <!-- Editable P. Venta Catálogo (Se refleja en LC) -->
+            <td class="py-2.5 px-3 text-right">
+              <input type="number" min="0" step="10" value="${p.salePrice}" onchange="updateCatalogPrice('${p.id}', 'salePrice', this.value)"
+                class="w-24 px-2 py-1 rounded-lg border border-sky-200 bg-sky-50/40 text-right text-xs font-extrabold text-sky-900 focus:outline-none focus:ring-2 focus:ring-sky-500" />
+            </td>
+
+            <td class="py-2.5 px-3 text-right">
+              <span class="px-2 py-0.5 rounded-full text-xs font-bold border ${marginClass}">${formatPct(margin)}</span>
+            </td>
+
+            <td class="py-2.5 px-3 text-xs text-slate-600">
+              ${p.lcData ? `${formatCLP(p.lcData.lastCost)} <span class="font-semibold text-amber-800">[${p.lcData.lastUnit}]</span>` : '-'}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function toggleCatalogLC(productId, isFixed) {
+      const prod = appState.catalog.find(p => p.id === productId);
+      if (!prod) return;
+      prod.inLC = Boolean(isFixed);
+      if (!prod.lcData) {
+        prod.lcData = {
+          buyToday: false,
+          provider: 'Feria / Calera',
+          lastCost: prod.cost,
+          lastUnit: 'Unidad',
+          qty: 1,
+          buyUnit: 'Unidad',
+          equiv: 1,
+          buyCost: prod.cost
+        };
+      }
+      saveState();
+      renderCatalogTab();
+      updateLCKPIs();
+      const badge = document.getElementById('lc-badge-count');
+      if (badge) badge.textContent = getFixedLCProducts().length;
+      showToast(isFixed
+        ? `"${prod.name}" fijado en Lista LC.`
+        : `"${prod.name}" quitado de Lista LC.`
+      );
+    }
+
+    function updateCatalogPrice(productId, field, rawVal) {
+      const prod = appState.catalog.find(p => p.id === productId);
+      if (!prod) return;
+      prod[field] = Number(rawVal) || 0;
+      saveState();
+      renderCatalogTab();
+      showToast(`Precio de "${prod.name}" actualizado (sincronizado con Lista LC).`);
+    }
+
+    function addCatalogProduct(event) {
+      event.preventDefault();
+      const code = document.getElementById('cat-new-code').value.trim();
+      const name = document.getElementById('cat-new-name').value.trim();
+      const cost = Number(document.getElementById('cat-new-cost').value) || 0;
+      const salePrice = Number(document.getElementById('cat-new-price').value) || 0;
+      const provider = document.getElementById('cat-new-prov').value.trim() || 'Feria / Calera';
+      const unit = document.getElementById('cat-new-unit').value || 'Kg';
+      const inLC = document.getElementById('cat-new-inlc').checked;
+
+      if (!code || !name) return;
+
+      const equiv = getDefaultEquivalence(unit);
+      const newProd = {
+        id: 'prod-' + code + '-' + Date.now(),
+        code,
+        name,
+        cost,
+        salePrice,
+        inLC,
+        lcData: {
+          buyToday: inLC,
+          provider,
+          lastCost: cost,
+          lastUnit: unit,
+          qty: 1,
+          buyUnit: unit,
+          equiv,
+          buyCost: cost
+        }
+      };
+
+      appState.catalog.unshift(newProd);
+      event.target.reset();
+      document.getElementById('cat-new-inlc').checked = true;
+
+      saveState();
+      renderCatalogTab();
+      const badge = document.getElementById('lc-badge-count');
+      if (badge) badge.textContent = getFixedLCProducts().length;
+      showToast(`"${name}" agregado al catálogo${inLC ? ' y fijado en Lista LC' : ''}.`);
+    }
+
+    // =========================================================================
+    // IMPORTACIÓN EXCEL / CSV DE CATÁLOGO (SIN BORRAR DATA ANTERIOR)
+    // =========================================================================
+    let pendingExcelRows = [];
+
+    function normalizeHeaderKey(str) {
+      return String(str || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '');
+    }
+
+    function parseCleanNumber(val) {
+      if (typeof val === 'number') return Math.round(val);
+      if (!val) return 0;
+      const cleaned = String(val).replace(/[^0-9.-]/g, '');
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? 0 : Math.round(num);
+    }
+
+    function downloadCatalogTemplate() {
+      const sampleRows = [
+        ['Código', 'Producto', 'P. Costo', 'P. Venta', 'Proveedor', 'Unidad'],
+        ['901', 'Palta Hass Premium', 3800, 5990, 'Feria / Calera', 'Kg'],
+        ['902', 'Frutilla Bandeja 500g', 1400, 2500, 'Feria / Calera', 'Bandeja'],
+        ['903', 'Arandano Exportacion', 1500, 2490, 'Fruta', 'Bandeja']
+      ];
+      if (typeof XLSX !== 'undefined') {
+        const ws = XLSX.utils.aoa_to_sheet(sampleRows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Catalogo');
+        XLSX.writeFile(wb, 'Plantilla_Catalogo_Rincon_Verde.xlsx');
+      } else {
+        downloadCSV('Plantilla_Catalogo_Rincon_Verde.csv', sampleRows);
+      }
+      showToast('Plantilla Excel descargada.');
+    }
+
+    function handleExcelCatalogUpload(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      if (typeof XLSX === 'undefined') {
+        showToast('No se pudo cargar el lector de Excel. Revisa tu conexión.', 'warning');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+          if (!rawRows || rawRows.length === 0) {
+            showToast('El archivo Excel está vacío o no tiene filas legibles.', 'warning');
+            return;
+          }
+
+          const existingByCode = new Map();
+          const existingByName = new Map();
+          appState.catalog.forEach(p => {
+            if (p.code) existingByCode.set(String(p.code).trim().toLowerCase(), p);
+            if (p.name) existingByName.set(String(p.name).trim().toLowerCase(), p);
+          });
+
+          pendingExcelRows = [];
+          rawRows.forEach((row, idx) => {
+            const keys = Object.keys(row);
+            let code = '';
+            let name = '';
+            let cost = 0;
+            let salePrice = 0;
+            let provider = '';
+            let unit = '';
+
+            keys.forEach(k => {
+              const nk = normalizeHeaderKey(k);
+              const val = row[k];
+              if (nk.includes('cod') || nk === 'plu' || nk === 'sku' || nk === 'barcode') {
+                code = String(val).trim();
+              } else if (nk.includes('prod') || nk.includes('desc') || nk.includes('nombre') || nk === 'articulo') {
+                name = String(val).trim();
+              } else if (nk.includes('costo') || nk === 'compra' || nk === 'pcosto') {
+                cost = parseCleanNumber(val);
+              } else if (nk.includes('venta') || nk.includes('precio') || nk === 'pventa' || nk === 'pvp') {
+                salePrice = parseCleanNumber(val);
+              } else if (nk.includes('prov')) {
+                provider = String(val).trim();
+              } else if (nk.includes('unid') || nk === 'medida') {
+                unit = String(val).trim();
+              }
+            });
+
+            if (!name && !code) return;
+            if (!name) name = `Producto ${code}`;
+            if (!code) code = String(9000 + appState.catalog.length + idx);
+
+            const match = existingByCode.get(code.toLowerCase()) || existingByName.get(name.toLowerCase());
+            pendingExcelRows.push({
+              code,
+              name,
+              cost,
+              salePrice,
+              provider,
+              unit,
+              isNew: !match,
+              existingProduct: match || null
+            });
+          });
+
+          if (pendingExcelRows.length === 0) {
+            showToast('No se detectaron columnas válidas (Código, Producto, P. Costo, P. Venta).', 'warning');
+            return;
+          }
+
+          renderExcelImportPreview(file.name);
+        } catch (err) {
+          console.error('Error leyendo Excel:', err);
+          showToast('Error al procesar el archivo Excel. Verifica que sea .xlsx, .xls o .csv.', 'warning');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function renderExcelImportPreview(fileName) {
+      const previewBox = document.getElementById('excel-import-preview');
+      const titleEl = document.getElementById('excel-preview-title');
+      const sumEl = document.getElementById('excel-preview-summary');
+      const tbody = document.getElementById('excel-preview-body');
+
+      const newCount = pendingExcelRows.filter(r => r.isNew).length;
+      const updCount = pendingExcelRows.filter(r => !r.isNew).length;
+
+      titleEl.textContent = `Archivo listo: ${fileName} (${pendingExcelRows.length} filas leídas)`;
+      sumEl.textContent = `✅ ${newCount} productos NUEVOS para agregar · 🔄 ${updCount} productos EXISTENTES (se conservará toda tu data anterior)`;
+
+      tbody.innerHTML = pendingExcelRows.slice(0, 60).map(r => `
+        <tr>
+          <td class="py-1.5 px-3">
+            ${r.isNew
+              ? '<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">NUEVO</span>'
+              : '<span class="px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-bold text-[10px]">EXISTENTE</span>'}
+          </td>
+          <td class="py-1.5 px-3 font-mono">${r.code}</td>
+          <td class="py-1.5 px-3 font-semibold">${r.name}</td>
+          <td class="py-1.5 px-3 text-right">${formatCLP(r.cost)}</td>
+          <td class="py-1.5 px-3 text-right font-bold text-emerald-300">${formatCLP(r.salePrice)}</td>
+        </tr>
+      `).join('');
+
+      if (pendingExcelRows.length > 60) {
+        tbody.innerHTML += `<tr><td colspan="5" class="py-2 px-3 text-center text-slate-400">... y ${pendingExcelRows.length - 60} productos más en el archivo</td></tr>`;
+      }
+
+      previewBox.classList.remove('hidden');
+    }
+
+    function cancelExcelImport() {
+      pendingExcelRows = [];
+      const input = document.getElementById('excel-catalog-input');
+      if (input) input.value = '';
+      document.getElementById('excel-import-preview').classList.add('hidden');
+    }
+
+    function applyExcelImport() {
+      if (pendingExcelRows.length === 0) return;
+
+      const updateExistingPrices = document.getElementById('excel-opt-update-prices').checked;
+      const fixNewInLC = document.getElementById('excel-opt-add-to-lc').checked;
+
+      let addedCount = 0;
+      let updatedCount = 0;
+
+      pendingExcelRows.forEach((item, idx) => {
+        if (item.isNew) {
+          const unit = item.unit || 'Unidad';
+          appState.catalog.unshift({
+            id: 'prod-xls-' + item.code + '-' + Date.now() + '-' + idx,
+            code: item.code,
+            name: item.name,
+            cost: item.cost,
+            salePrice: item.salePrice,
+            inLC: fixNewInLC,
+            lcData: {
+              buyToday: false,
+              provider: item.provider || 'Feria / Calera',
+              lastCost: item.cost,
+              lastUnit: unit,
+              qty: 1,
+              buyUnit: unit,
+              equiv: getDefaultEquivalence(unit),
+              buyCost: item.cost
+            }
+          });
+          addedCount++;
+        } else if (item.existingProduct && updateExistingPrices) {
+          if (item.cost > 0) item.existingProduct.cost = item.cost;
+          if (item.salePrice > 0) item.existingProduct.salePrice = item.salePrice;
+          if (item.provider && item.existingProduct.lcData) {
+            item.existingProduct.lcData.provider = item.provider;
+          }
+          updatedCount++;
+        }
+      });
+
+      saveState();
+      cancelExcelImport();
+      renderCatalogTab();
+      const badge = document.getElementById('lc-badge-count');
+      if (badge) badge.textContent = getFixedLCProducts().length;
+
+      showToast(`Catálogo actualizado sin borrar data: +${addedCount} nuevos agregados, ${updatedCount} actualizados.`);
+    }
+
+    // =========================================================================
+    // CSV EXPORTS
+    // =========================================================================
+    function downloadCSV(filename, rows) {
+      const csvContent = '\uFEFF' + rows.map(r =>
+        r.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(';')
+      ).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function exportLCOrderCSV() {
+      const fixed = getFixedLCProducts();
+      const rows = [
+        ['Comprar Hoy', 'PLU', 'Producto', 'Proveedor', 'Costo Anterior', 'Unidad Anterior', 'Cant. Compra', 'Unidad Compra', 'Equivalencia', 'Precio Compra', 'Costo Unit. Real', 'P. Venta Catalogo (Ref)', 'Subtotal']
+      ];
+
+      fixed.forEach(p => {
+        const d = p.lcData;
+        const qty = Number(d.qty) || 0;
+        const buyCost = Number(d.buyCost) || 0;
+        const equiv = Math.max(0.01, Number(d.equiv) || 1);
+        const unitCost = Math.round(buyCost / equiv);
+        rows.push([
+          d.buyToday ? 'SI' : 'NO',
+          p.code,
+          p.name,
+          d.provider || '',
+          d.lastCost,
+          d.lastUnit || '',
+          qty,
+          d.buyUnit || '',
+          equiv,
+          buyCost,
+          unitCost,
+          p.salePrice,
+          qty * buyCost
+        ]);
+      });
+
+      downloadCSV('Lista_LC_Fija_Planificacion.csv', rows);
+      showToast('Lista LC Fija exportada a CSV.');
+    }
+
+    function exportFullReportCSV() {
+      const active = getActiveMonthData();
+      const t = getTotals();
+      const rows = [
+        [`VERDULERIA RINCON VERDE - RESUMEN EJECUTIVO (${active.name.toUpperCase()})`],
+        ['Indicador', 'Monto ($)', 'Detalle'],
+        ['Ingresos por Retiro', t.totalRetiro, `Efectivo: ${t.totalEfectivo} | Tarjeta: ${t.totalTarjeta}`],
+        ['Ventas POS Eleventa', t.totalEleventa, `Ganancia Bruta POS: ${t.totalGainPOS}`],
+        ['Total Gastos Consolidados', t.totalGastos, `${active.categories.length} partidas`],
+        ['Utilidad Neta', t.utilidadNeta, `Margen Neto: ${t.margenNeto.toFixed(1)}%`],
+        [],
+        ['HOJA RESUMEN DE GASTOS POR CATEGORIA'],
+        ['Categoria', 'Tipo', 'Monto Acumulado ($)', '% del Gasto']
+      ];
+
+      active.categories.forEach(c => {
+        const pct = t.totalGastos > 0 ? ((c.amount / t.totalGastos) * 100).toFixed(1) + '%' : '0%';
+        rows.push([c.name, c.type, c.amount, pct]);
+      });
+
+      const safeFile = active.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+      downloadCSV(`Rincon_Verde_Resumen_${safeFile}.csv`, rows);
+      showToast(`Resumen Ejecutivo de ${active.name} exportado a CSV.`);
+    }
+
+    // =========================================================================
+    // INITIALIZATION
+    // =========================================================================
+    function renderAll() {
+      renderMonthSelector();
+      renderDashboard();
+      renderScannerTab();
+      renderLCTab();
+      renderCajaTab();
+      renderCatalogTab();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadState();
+      renderAll();
+    });
+  </script>
+</body>
+</html>
